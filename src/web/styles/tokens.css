@@ -1,0 +1,347 @@
+@import 'tailwindcss';
+
+/**
+ * Design tokens and component styles.
+ *
+ * Dark-first, because an uptime dashboard is most often left open on a wall
+ * display or a second monitor, and because status colour reads better against a
+ * dark ground. Everything is a CSS custom property so Recharts and inline
+ * styles can read the same values without importing a JS theme object.
+ */
+
+@theme {
+  --color-surface-0: #06090f;
+  --color-surface-1: #0b111b;
+  --color-surface-2: #111a28;
+  --color-surface-3: #182334;
+  --color-surface-4: #1f2c40;
+
+  --color-border-subtle: #1c2637;
+  --color-border-strong: #2b3a52;
+
+  --color-text-primary: #e9eefa;
+  --color-text-secondary: #97a5bd;
+  --color-text-tertiary: #64738d;
+
+  --color-accent: #5b8cff;
+  --color-accent-soft: #5b8cff1f;
+
+  --color-up: #34d399;
+  --color-degraded: #fbbf24;
+  --color-down: #fb7185;
+  --color-paused: #64738d;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Layered surfaces: each step is a small, consistent lift. */
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -18px rgb(0 0 0 / 0.85);
+  --shadow-pop: 0 8px 40px -12px rgb(0 0 0 / 0.9);
+
+  --radius-panel: 16px;
+  --radius-control: 10px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Chart palette, readable by Recharts and by inline SVG. */
+  --chart-up: #34d399;
+  --chart-degraded: #fbbf24;
+  --chart-down: #fb7185;
+  --chart-accent: #5b8cff;
+  --chart-grid: #1c2637;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(1100px 560px at 8% -12%, #142238 0%, transparent 62%),
+    radial-gradient(820px 480px at 102% -4%, #0f1c2e 0%, transparent 58%),
+    var(--color-surface-0);
+  background-attachment: fixed;
+  color: var(--color-text-primary);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-synthesis-weight: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* ---------------------------------------------------------------- utilities */
+
+/** Numerals line up in tables and stat tiles when they do not shift width. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/** Truncate a single line with an ellipsis. */
+.truncate-1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ------------------------------------------------------------------ panels */
+
+.panel {
+  background: color-mix(in srgb, var(--color-surface-1) 88%, transparent);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  backdrop-filter: blur(8px);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--color-text-primary);
+}
+
+.panel-subtitle {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+}
+
+/* ------------------------------------------------------------------ status */
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+@keyframes pulse-ring-slow {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+/* Only *down* and *degraded* pulse. A pulsing "up" would be visual noise. */
+.status-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: currentColor;
+  animation: pulse-ring 2s var(--ease-out) infinite;
+}
+
+.status-pulse-slow::after {
+  animation-name: pulse-ring-slow;
+  animation-duration: 3.2s;
+}
+
+/* ------------------------------------------------------------- uptime bars */
+
+.uptime-bar {
+  transition: opacity 160ms var(--ease-out);
+}
+
+.uptime-bar:hover {
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------- skeleton */
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 0%,
+    var(--color-surface-3) 40%,
+    var(--color-surface-2) 80%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 6px;
+}
+
+/* ------------------------------------------------------------ map + leaflet */
+
+.leaflet-container {
+  background: var(--color-surface-0);
+  font-family: inherit;
+  /* The map is a fixed-height panel; never let it grow unbounded. */
+  height: 100%;
+  width: 100%;
+  z-index: 0;
+}
+
+/*
+ * Dark basemap without a paid tile provider.
+ *
+ * Inverting the raster tiles and rotating hue back turns OpenStreetMap's light
+ * style into a dark one. Applied to the tile pane only, so our markers,
+ * popups and controls (which are DOM siblings) keep their real colours — this
+ * is why the filter is scoped here rather than on the whole container.
+ */
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.94) contrast(0.86) saturate(0.55);
+}
+
+/* Leaflet ships light-mode chrome (attribution, zoom buttons). Align it. */
+.leaflet-control-attribution {
+  background: rgb(6 9 15 / 0.82) !important;
+  color: var(--color-text-tertiary) !important;
+  font-size: 10px !important;
+  border-radius: 6px 0 0 0;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-text-secondary) !important;
+}
+
+.leaflet-bar {
+  border: 1px solid var(--color-border-subtle) !important;
+  box-shadow: var(--shadow-panel) !important;
+}
+
+.leaflet-bar a {
+  background: var(--color-surface-2) !important;
+  color: var(--color-text-primary) !important;
+  border-bottom-color: var(--color-border-subtle) !important;
+}
+
+.leaflet-bar a:hover {
+  background: var(--color-surface-3) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--color-surface-2);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-pop);
+}
+
+.leaflet-popup-content-wrapper {
+  border: 1px solid var(--color-border-strong);
+  border-radius: 12px;
+}
+
+/* Custom edge marker: a dot with an optional pulse ring. */
+.edge-marker {
+  display: grid;
+  place-items: center;
+  position: relative;
+}
+
+.edge-marker__dot {
+  border-radius: 999px;
+  border: 1.5px solid rgb(255 255 255 / 0.9);
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.6);
+}
+
+.edge-marker__pulse {
+  position: absolute;
+  border-radius: 999px;
+  animation: pulse-ring 2.2s var(--ease-out) infinite;
+}
+
+/* Fallback shown when map tiles cannot load (offline). */
+.map-offline-note {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 8px;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 500;
+}
+
+/* ------------------------------------------------------------------ motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Keyboard focus must be obvious on a dark ground. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Scrollbars that do not fight the dark theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-4) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-surface-4);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-strong);
+  background-clip: content-box;
+}

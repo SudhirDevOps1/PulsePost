@@ -1,0 +1,69 @@
+{
+  "name": "pulsepost",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Unified full-stack, multi-database uptime monitor running on a single Cloudflare Worker",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SudhirDevOps1/PulsePost.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SudhirDevOps1/PulsePost/issues"
+  },
+  "homepage": "https://github.com/SudhirDevOps1/PulsePost#readme",
+  "keywords": [
+    "uptime-monitor",
+    "status-page",
+    "cloudflare-workers",
+    "d1",
+    "self-hosted"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "gen:migrations": "node scripts/gen-migrations.mjs",
+    "fix:imports": "node scripts/fix-imports.mjs",
+    "build": "node scripts/gen-migrations.mjs && vite build",
+    "dev": "node scripts/gen-migrations.mjs && vite build && wrangler dev",
+    "dev:web": "vite",
+    "preview": "node scripts/gen-migrations.mjs && vite build && wrangler dev",
+    "deploy": "node scripts/gen-migrations.mjs && vite build && wrangler deploy",
+    "deploy:dry": "node scripts/gen-migrations.mjs && vite build && wrangler deploy --dry-run",
+    "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "verify": "node scripts/gen-migrations.mjs && node scripts/fix-imports.mjs && tsc --noEmit && node --experimental-strip-types --test tests/*.test.ts",
+    "offline:prepare": "pnpm fetch --store-dir .pnpm-store",
+    "offline:install": "pnpm install --offline --frozen-lockfile",
+    "offline:check": "node scripts/check-offline.mjs"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.9.1",
+    "@libsql/client": "^0.18.0",
+    "@neondatabase/serverless": "^1.2.0",
+    "hono": "^4.13.13",
+    "postgres": "^3.4.9",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251202.0",
+    "@tailwindcss/vite": "^4.1.17",
+    "@types/leaflet": "^1.9.20",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "leaflet": "^1.9.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.0.0",
+    "recharts": "^3.10.1",
+    "tailwindcss": "^4.1.17",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "wrangler": "^4.51.0"
+  }
+}

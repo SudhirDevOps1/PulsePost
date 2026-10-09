@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Dependencies
+# ---------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+# ---------------------------------------------------------------------------
+# Build output
+# ---------------------------------------------------------------------------
+dist/
+.open-next/
+.wrangler/
+.wrangler-dryrun/
+
+# ---------------------------------------------------------------------------
+# Per-deployment config — generated from wrangler.toml.example by setup.sh/.ps1
+# Contains your database IDs, so it stays out of the repo.
+# ---------------------------------------------------------------------------
+wrangler.toml
+wrangler.jsonc
+
+# ---------------------------------------------------------------------------
+# Secrets — NEVER commit these
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+*.pem
+*.key
+
+# ---------------------------------------------------------------------------
+# Local databases
+# ---------------------------------------------------------------------------
+data/
+*.sqlite
+*.sqlite3
+*.db
+
+# ---------------------------------------------------------------------------
+# Vendored package store
+#
+# Gitignored on purpose: ~224 MB of content-addressed blobs would bloat repo
+# history permanently, and it is regenerable with `pnpm offline:prepare`.
+# For an air-gapped machine, ship it as a tarball next to the repo instead:
+#   tar czf pnpm-store.tar.gz .pnpm-store
+# ---------------------------------------------------------------------------
+.pnpm-store/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ---------------------------------------------------------------------------
+# Reference clone (analysis only)
+# ---------------------------------------------------------------------------
+_reference_pingflare/

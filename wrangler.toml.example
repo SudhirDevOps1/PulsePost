@@ -1,0 +1,145 @@
+# ===========================================================================
+#  pulsepost — Cloudflare Workers configuration (EXAMPLE)
+# ===========================================================================
+#  Copy to `wrangler.toml` and uncomment ONLY the database provider you chose.
+#  `setup.sh` / `setup.ps1` do this for you automatically.
+#
+#  NEVER put secrets in this file. Use:  wrangler secret put <NAME>
+# ===========================================================================
+
+name = "pulsepost"
+main = "src/worker/index.ts"
+compatibility_date = "2025-11-17"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers Static Assets — serves the built React SPA.
+# `single-page-application` makes unknown paths fall back to index.html so
+# client-side routing (e.g. /status/my-team) works on hard refresh.
+[assets]
+directory = "dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Run health checks every minute (Cloudflare's free-tier minimum).
+[triggers]
+crons = ["* * * * *"]
+
+# ---------------------------------------------------------------------------
+# Rate limiting — edge-accurate, native to Workers (free plan supported)
+# ---------------------------------------------------------------------------
+[[unsafe.bindings]]
+name = "RATE_LIMITER_AUTH"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[[unsafe.bindings]]
+name = "RATE_LIMITER_API"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 300, period = 60 }
+
+# ---------------------------------------------------------------------------
+# Database provider — pick exactly ONE
+# ---------------------------------------------------------------------------
+
+# --- 1. Cloudflare D1 (default, zero-config, recommended) ------------------
+# Create with:  wrangler d1 create pulsepost-db
+# Then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "pulsepost-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "migrations"
+
+# --- 2. Turso (LibSQL) -----------------------------------------------------
+# No wrangler binding. Set secrets instead:
+#   wrangler secret put TURSO_DATABASE_URL
+#   wrangler secret put TURSO_AUTH_TOKEN
+
+# --- 3. Neon (Serverless Postgres over WebSocket) --------------------------
+# No wrangler binding. Set secrets instead:
+#   wrangler secret put NEON_DATABASE_URL
+#   wrangler secret put NEON_DATABASE_URL_POOLER
+
+# --- 4. Supabase (Postgres over Supaviser) ---------------------------------
+# No wrangler binding. Set secrets instead:
+#   wrangler secret put SUPABASE_DATABASE_URL
+#
+# Supabase direct connections use IPv6-only, which Workers cannot reach.
+# Always use the pooler:  postgresql://postgres.<ref>:<pw>@aws-0-<region>.pooler.supabase.com:6543/postgres
+
+# --- 5. PostgreSQL via Hyperdrive ------------------------------------------
+# Create with:  wrangler hyperdrive create pulsepost-pg --connection-string="postgresql://..."
+# Credentials are injected into the Worker by Hyperdrive — do NOT also set them as secrets.
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "REPLACE_WITH_YOUR_HYPERDRIVE_ID"
+
+# --- 6. SQLite (local dev / self-hosted Docker) -----------------------------
+# Not deployed to Workers. Used by `docker compose up` and `pnpm db:migrate`.
+# No wrangler binding. Set DATABASE_URL=file:./data/pulsepost.db
+
+# ---------------------------------------------------------------------------
+# Optional: R2 for raw check-history backups
+# ---------------------------------------------------------------------------
+# wrangler r2 bucket create pulsepost-backups
+# [[r2_buckets]]
+# binding = "BACKUPS"
+# bucket_name = "pulsepost-backups"
+
+# ===========================================================================
+#  Plain-text configuration (safe to commit — no secrets here)
+# ===========================================================================
+[vars]
+# Which adapter to activate: d1 | turso | neon | supabase | hyperdrive | sqlite
+DB_PROVIDER = "d1"
+
+ENVIRONMENT = "production"
+APP_NAME = "PulsePost"
+
+# Comma-separated origins allowed to call the API from a browser.
+# Same-origin browser requests are always allowed.
+CORS_ORIGINS = ""
+
+# Comma-separated IPs / CIDR ranges allowed to reach /api/auth/* and /admin.
+# Empty = allow all (Basic/TOTP auth still applies).
+ADMIN_IP_ALLOWLIST = ""
+
+# Auth policy for the admin API.
+#   password  — database-backed sessions (PBKDF2). Default.
+#   basic     — HTTP Basic against ADMIN_USERNAME / ADMIN_PASSWORD (good for Docker).
+#   totp      — password login plus mandatory TOTP second factor.
+AUTH_MODE = "password"
+
+# Comma-separated list of Cloudflare colo codes to run checks from.
+# Empty = run from the colo that receives the cron event.
+CHECK_COLOS = ""
+
+# How many monitors to check per cron invocation (Workers free tier allows
+# 50 subrequests per invocation; keep headroom for notification calls).
+CHECKS_PER_RUN = 20
+
+# Retention windows, in days.
+RAW_CHECK_RETENTION_DAYS = 7
+DAILY_STATUS_RETENTION_DAYS = 365
+
+# Hour (UTC) at which daily aggregation + cleanup runs. 0 = midnight.
+MAINTENANCE_HOUR_UTC = 0
+
+# ===========================================================================
+#  Secrets — set with `wrangler secret put <NAME>`, never in this file
+# ===========================================================================
+#  CRON_SECRET           Random 32-byte hex. Authorises the scheduled sweep.
+#  ADMIN_USERNAME        Only for AUTH_MODE = basic.
+#  ADMIN_PASSWORD        Only for AUTH_MODE = basic.
+#  TOTP_SECRET           Passphrase that encrypts per-user TOTP seeds at rest.
+#                        Required to enrol TOTP at all — there is no built-in
+#                        fallback key, because a public one would be worthless.
+#  TURSO_DATABASE_URL / TURSO_AUTH_TOKEN
+#  NEON_DATABASE_URL / NEON_DATABASE_URL_POOLER
+#  SUPABASE_DATABASE_URL
+#  DATABASE_URL          Only for provider = sqlite
+#
+#  Generate a secret with:
+#    node -e "console.log(crypto.randomUUID()+crypto.randomUUID())"

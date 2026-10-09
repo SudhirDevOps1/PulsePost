@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+#  Local development secrets — copy to `.dev.vars` (gitignored, never commit).
+#      cp .dev.vars.example .dev.vars
+#
+#  `.dev.vars` is read by `wrangler dev`. For production use
+#  `wrangler secret put <NAME>` — never put secrets in wrangler.toml.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Non-secret config — these mirror [vars] in wrangler.toml and make the local
+# dev server behave like production.
+# ---------------------------------------------------------------------------
+DB_PROVIDER = "d1"
+ENVIRONMENT = "development"
+APP_NAME = "PulsePost"
+
+# Keep SSRF protection ON locally. Turn this on only when you intend to monitor
+# localhost / private addresses (the Docker case). It is never inferred from
+# ENVIRONMENT.
+ALLOW_PRIVATE_TARGETS = "false"
+
+# ---------------------------------------------------------------------------
+# Secrets — every value below MUST be replaced before use.
+# ---------------------------------------------------------------------------
+
+# Authorises the scheduled sweep. Any random 32-byte hex works.
+#   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+CRON_SECRET = "dev-only-change-me"
+
+# Basic-auth fallback. Only read when AUTH_MODE = "basic".
+# AUTH_MODE = "password"
+# ADMIN_USERNAME = "admin"
+# ADMIN_PASSWORD = "change-me-too"
+
+# Only needed for the non-D1 database providers.
+# TURSO_DATABASE_URL = "libsql://your-db.turso.io"
+# TURSO_AUTH_TOKEN = "..."
+# NEON_DATABASE_URL = "postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require"
+# NEON_DATABASE_URL_POOLER = "postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require&pool_mode=transaction"
+# SUPABASE_DATABASE_URL = "postgresql://postgres.PROJECT:PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres"
+
+# Local SQLite file, used by provider "sqlite" and by `pnpm db:migrate`.
+# DATABASE_URL = "file:./data/pulsepost.db"

@@ -1,0 +1,22 @@
+# ---------------------------------------------------------------------------
+# pnpm settings
+#
+# These live here rather than in .npmrc on purpose: .npmrc is also read by npm
+# and bun, which warn about pnpm-specific keys. Keeping them here means a
+# `npm run build` works without spraying warnings.
+# ---------------------------------------------------------------------------
+
+# Vendor packages into the project rather than the global store.
+#
+# This is what makes offline installs portable. With the default global store,
+# a fresh checkout elsewhere has nothing to install from and must hit the
+# network. `pnpm offline:prepare` populates this folder.
+storeDir: .pnpm-store
+
+# Only these packages may run install scripts. esbuild and workerd need their
+# postinstall step to place native binaries; every other package is denied.
+# (esbuild resolves to several nested versions — a bare `esbuild` entry covers
+# all of them, whereas a version-pinned allow/deny pair would conflict.)
+allowBuilds:
+  esbuild: true
+  workerd: true

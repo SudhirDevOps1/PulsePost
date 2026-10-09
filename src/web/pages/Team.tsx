@@ -159,14 +159,14 @@ export function TeamPage({ currentUserId }: { currentUserId: string }) {
     <div className="space-y-5">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Team</h1>
-        <p className="text-xs text-[--color-text-tertiary]">
+        <p className="text-xs text-[var(--color-text-tertiary)]">
           {users.length} account{users.length === 1 ? '' : 's'} · {adminCount} admin
           {adminCount === 1 ? '' : 's'}
         </p>
       </header>
 
       {notice ? (
-        <p className="text-xs text-[--color-up]" role="status">
+        <p className="text-xs text-[var(--color-up)]" role="status">
           {notice}
         </p>
       ) : null}
@@ -242,7 +242,7 @@ export function TeamPage({ currentUserId }: { currentUserId: string }) {
                   <span className="flex items-center gap-2">
                     <span className="truncate-1">{user.name}</span>
                     {isSelf ? <Badge>you</Badge> : null}
-                    {user.totp_enabled ? <Badge color="var(--color-accent)">2FA</Badge> : null}
+                    {user.totp_enabled ? <Badge color="var(--color-accent-text)">2FA</Badge> : null}
                   </span>
                 }
                 subtitle={
@@ -251,7 +251,7 @@ export function TeamPage({ currentUserId }: { currentUserId: string }) {
                     <span>last seen {timeAgo(user.last_login_at)}</span>
                   </span>
                 }
-                actions={<Badge color="var(--color-accent)">{ROLE_LABEL[user.role]}</Badge>}
+                actions={<Badge color="var(--color-accent-text)">{ROLE_LABEL[user.role]}</Badge>}
               >
                 <div className="flex flex-wrap items-end gap-3">
                   <Field label="Role" className="w-40">
@@ -284,7 +284,7 @@ export function TeamPage({ currentUserId }: { currentUserId: string }) {
                         </Button>
                       )
                     ) : user.totp_enabled ? (
-                      <span className="self-center pb-1 text-[11px] text-[--color-text-tertiary]">
+                      <span className="self-center pb-1 text-[11px] text-[var(--color-text-tertiary)]">
                         2FA enabled
                       </span>
                     ) : null}
@@ -304,7 +304,7 @@ export function TeamPage({ currentUserId }: { currentUserId: string }) {
                 </div>
 
                 {isLastAdmin && !isSelf ? (
-                  <p className="mt-3 text-[11px] text-[--color-text-tertiary]">
+                  <p className="mt-3 text-[11px] text-[var(--color-text-tertiary)]">
                     The last admin cannot be demoted or deleted — promote someone else first.
                   </p>
                 ) : null}
@@ -376,8 +376,8 @@ function TotpDialog({
 
         {secret ? (
           <>
-            <div className="rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-2] px-4 py-3">
-              <p className="text-[11px] uppercase tracking-wide text-[--color-text-tertiary]">Secret</p>
+            <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-4 py-3">
+              <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-tertiary)]">Secret</p>
               <p className="tabular mt-1 break-all text-sm">{secret}</p>
             </div>
 

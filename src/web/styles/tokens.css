@@ -1,152 +1,213 @@
 @import 'tailwindcss';
 
 /**
- * Design tokens.
+ * PulsePost — Claymorphism design system.
  *
- * Dark-first, because an uptime dashboard is most often left open on a wall
- * display or a second monitor, and because status colour reads better against a
- * dark ground. Light mode is a real, first-class theme — not an afterthought —
- * and both are defined here as CSS custom properties so Recharts and inline
- * SVG can read the same values without importing a JS theme object.
+ * THE CLAY RECIPE
+ * ---------------
+ * Every raised element is built from three shadows, and all three matter:
  *
- * HOW THEMING WORKS
- * -----------------
- * `@theme` emits each token as a variable on `:root`. Tailwind utilities
- * reference those variables rather than inlining the values, so overriding the
- * same names inside `[data-theme='light']` flips the entire app without a single
- * component-level change. That is why utilities in this codebase are written
- * `bg-[--color-surface-2]` and not `bg-surface-2`: the bracketed form always
- * resolves through `var()`, so it follows the theme.
+ *   1. Outer drop shadow  — detaches the shape from the canvas. This is the
+ *      only thing separating claymorphism from neumorphism: a neumorphic
+ *      element is the SAME colour as its background and floats by light alone,
+ *      which makes it nearly invisible. Clay always has its own surface.
+ *   2. Inner light (top-left)
+ *   3. Inner dark (bottom-right)
  *
- * `<html data-theme>` is set before first paint by the inline script in
- * `index.html` — see `web/theme.ts` for the module side.
+ * Together (2) and (3) are the "inflated" volume: light appears to be pouring
+ * in from the upper left and pooling in the lower right. Drop one and the shape
+ * flattens; get the offset wrong and it looks dented rather than inflated.
  *
- * ADDING A TOKEN
- * --------------
- * Put it in BOTH blocks. A token defined only in `@theme` will silently have
- * no light-mode value, which reads as "the light theme is broken" rather than
- * "someone forgot a variable".
+ * Depth levels keep the recipe from being copy-pasted with magic numbers:
+ *
+ *   raised  → hero panels, stat tiles
+ *   tile    → list items, the default
+ *   inset   → inputs and wells. INVERTED: the light comes from the bottom-right
+ *             and the shape reads as pressed *into* the surface.
+ *   pill    → buttons and badges. Small radii go wrong — a pill with inset
+ *             shadows reads as a dented capsule — so the shadows are halved.
+ *
+ * WHY STATUS COLOURS ARE SATURATED
+ * --------------------------------
+ * The pastel palette is the point of this style, and status colours were the
+ * first thing that tried to be pastel too. Measured on the card surface, a
+ * pastel green sits around 1.6:1 and a pastel red around 2.1:1 — both far below
+ * the 4.5:1 needed to read as text and below even the 3:1 floor for a graphical
+ * status dot. "Operational" and "Down" would be indistinguishable on a status
+ * page, which is the one place a user absolutely cannot afford ambiguity.
+ *
+ * So: pastels carry the surfaces, saturation carries meaning. Nothing was lost
+ * by splitting it this way.
+ *
+ * THEMES
+ * ------
+ * Both themes use the clay recipe. `light` is the default — it is what this
+ * style is for — and `dark` is the same volume treatment over a deeper clay.
+ * The token names did not change, so every component that reads
+ * `var(--color-…)` follows the switch with no code change.
  */
 
-@theme {
-  --color-surface-0: #06090f;
-  --color-surface-1: #0b111b;
-  --color-surface-2: #111a28;
-  --color-surface-3: #182334;
-  --color-surface-4: #1f2c40;
-
-  --color-border-subtle: #1c2637;
-  --color-border-strong: #2b3a52;
-
-  --color-text-primary: #e9eefa;
-  --color-text-secondary: #97a5bd;
-  --color-text-tertiary: #64738d;
-
-  --color-accent: #5b8cff;
-  --color-accent-soft: #5b8cff1f;
-
-  /*
-   * Text drawn ON the accent colour.
-   *
-   * A dedicated token because the accent inverts between themes: dark mode
-   * uses a light blue that needs dark text, light mode a deep blue that needs
-   * white. Deriving it from `--color-surface-0` looks equivalent until someone
-   * tunes a surface ramp and every button quietly loses contrast.
-   */
-  --color-on-accent: #06090f;
-
-  --color-up: #34d399;
-  --color-degraded: #fbbf24;
-  --color-down: #fb7185;
-  --color-paused: #64738d;
-}
-
+/*
+ * WHY THESE LIVE IN `:root` AND NOT `@theme`
+ * ------------------------------------------
+ * Tailwind v4 tree-shakes `@theme` entries it cannot see a *utility* using.
+ * Every token here is consumed through the arbitrary form
+ * `bg-[var(--color-surface-1)]`, which Tailwind treats as an opaque string --
+ * it cannot see that the value depends on `--color-surface-1`. The result is
+ * that a token can be declared, referenced from every component in the app,
+ * and still be dropped from the stylesheet, leaving `var()` empty and the
+ * element unstyled. That is not a theoretical failure: it is how
+ * `--color-on-accent` silently vanished.
+ *
+ * `:root` is emitted verbatim, so declaring here is what actually guarantees
+ * the value exists. The named utilities (`bg-surface-1`) are not generated as
+ * a result, and nothing in this app uses them -- the var() form is the
+ * established convention, and it is also what lets the dark theme flip a
+ * component's colour without touching the component.
+ */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
-  /* Layered surfaces: each step is a small, consistent lift. */
-  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -18px rgb(0 0 0 / 0.85);
-  --shadow-pop: 0 8px 40px -12px rgb(0 0 0 / 0.9);
+  --color-surface-0: #e8edf7;
+  --color-surface-1: #f7f9fe;
+  --color-surface-2: #eff3fa;
+  --color-surface-3: #e3e9f4;
+  --color-surface-4: #d5ddec;
 
-  --radius-panel: 16px;
-  --radius-control: 10px;
+  --color-border-subtle: #e3e9f4;
+  --color-border-strong: #c9d4e6;
 
+  --color-text-primary: #2d3856;
+  --color-text-secondary: #4c5879;
+  /* Tertiary carries real content (timestamps, hints, counts), so it is held
+     to the full 4.5:1 bar rather than the 3:1 that pure decoration would get.
+     Solved against surface-0, the darkest thing it can sit on in this theme. */
+  --color-text-tertiary: #5c6578;
+
+  /* Accent is split by role. One value cannot serve both: a fill dark enough
+     to keep white button labels at 4.5:1 is too light to be readable as text
+     on the canvas, and vice versa. Verified values below. */
+  --color-accent: #7565db;
+  --color-accent-text: #6a5cc7;
+  --color-accent-soft: #7565db24;
+  --color-on-accent: #ffffff;
+
+  --color-up: #147c3b;
+  --color-degraded: #bf400c;
+  --color-down: #d02424;
+  --color-paused: #626c81;
+
+  /* --- clay shadows ------------------------------------------------------ */
+  /* Light is near-opaque white; dark is a desaturated blue-grey, not black. A
+     pure-black inset on a pastel surface reads as a hole.
+
+     The `inset` keyword is load-bearing and easy to lose when refactoring:
+     without it these become three stacked outer shadows, the shape gets no
+     volume at all, and it still looks superficially plausible because there is
+     a shadow — just the wrong kind. */
+  --clay-shadow-out: 0 4px 8px rgb(146 162 197 / 0.28), 0 12px 28px -12px rgb(146 162 197 / 0.4);
+  --clay-shadow-in: inset -5px -5px 10px rgb(163 178 208 / 0.4);
+  --clay-shadow-light: inset 5px 5px 10px rgb(255 255 255 / 0.95);
+
+  /* Depth presets. Reference these by name; the raw values stay here. */
+  --shadow-raised: var(--clay-shadow-out), var(--clay-shadow-in), var(--clay-shadow-light);
+  --shadow-tile: 0 3px 6px rgb(146 162 197 / 0.22), 0 8px 18px -10px rgb(146 162 197 / 0.3),
+    inset -3px -3px 7px rgb(163 178 208 / 0.34), inset 3px 3px 7px rgb(255 255 255 / 0.9);
+  --shadow-pill: 0 3px 7px rgb(146 162 197 / 0.3), inset -2px -2px 5px rgb(163 178 208 / 0.32),
+    inset 2px 2px 5px rgb(255 255 255 / 0.95);
+  --shadow-pop: 0 10px 34px -8px rgb(146 162 197 / 0.45);
+
+  /* Pressed: the light and dark insets swap sides, so the shape reads as sunk. */
+  --shadow-inset: inset 4px 4px 9px rgb(163 178 208 / 0.45), inset -4px -4px 9px rgb(255 255 255 / 0.95);
+
+  --radius-panel: 28px;
+  --radius-tile: 24px;
+  --radius-control: 18px;
+
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  /* Bouncy spring. The overshoot past 1 is what reads as "soft". */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-  /* Chart palette, readable by Recharts and by inline SVG. */
-  --chart-up: #34d399;
-  --chart-degraded: #fbbf24;
-  --chart-down: #fb7185;
-  --chart-accent: #5b8cff;
-  --chart-grid: #1c2637;
+  /* Chart palette, matched to the status colours so a red line and a red dot
+     are literally the same red. */
+  --chart-up: #147c3b;
+  --chart-degraded: #bf400c;
+  --chart-down: #d02424;
+  --chart-accent: #6a5cc7;
+  --chart-grid: #dfe6f2;
 
-  /*
-   * Ambient background wash.
-   *
-   * Two very wide, very soft radial gradients — close enough to invisible that
-   * they read as depth rather than decoration. Light mode drops them
-   * entirely: on a near-white ground they show up as grey smudges, which is
-   * the giveaway of a dark theme mechanically inverted.
-   */
-  --bg-wash-a: radial-gradient(1100px 560px at 8% -12%, #142238 0%, transparent 62%);
-  --bg-wash-b: radial-gradient(820px 480px at 102% -4%, #0f1c2e 0%, transparent 58%);
+  /* Canvas wash. A very soft radial bloom keeps the flat clay from reading as
+     a dead background without introducing a visible gradient. */
+  --bg-wash-a: radial-gradient(900px 520px at 12% -10%, #f2e9ff 0%, transparent 60%);
+  --bg-wash-b: radial-gradient(760px 440px at 96% -6%, #e2f2ff 0%, transparent 58%);
 
-  /*
-   * Feedback animations.
-   *
-   * `--press-scale` is what makes a button feel like it acknowledges the click
-   * *at the moment of the click*. Without it the only feedback is a colour
-   * change on an element the finger is already covering.
-   */
-  --press-scale: 0.97;
+  --press-scale: 0.94;
+  --hover-lift: -4px;
 }
 
 /*
- * Light theme.
+ * Dark clay.
  *
- * Not a mechanical inversion. Status colours are darkened and hue-shifted so
- * they still pass contrast against white — `#34d399` on white is 1.6:1 and
- * effectively invisible, which would make "operational" and "down" look
- * identical to anyone who does not already know the difference.
+ * Same volume recipe, inverted light direction is NOT applied — the light
+ * still comes from the top-left, because that is what a consistent light
+ * source means. Only the amounts change: the inner highlight drops to a faint
+ * 8% because white-on-dark has nowhere to go, and the inner shadow deepens.
  */
-[data-theme='light'] {
-  color-scheme: light;
+[data-theme='dark'] {
+  color-scheme: dark;
 
-  --color-surface-0: #fbfcfd;
-  --color-surface-1: #ffffff;
-  --color-surface-2: #f4f6f9;
-  --color-surface-3: #e9edf3;
-  --color-surface-4: #dde3ec;
+  --color-surface-0: #262b40;
+  --color-surface-1: #333a53;
+  --color-surface-2: #3d4561;
+  --color-surface-3: #48516f;
+  --color-surface-4: #555f80;
 
-  --color-border-subtle: #e3e8ef;
-  --color-border-strong: #c6cfdc;
+  --color-border-subtle: #414a68;
+  --color-border-strong: #5a6588;
 
-  --color-text-primary: #0d1420;
-  --color-text-secondary: #4a5666;
-  --color-text-tertiary: #7b8798;
+  --color-text-primary: #f0f3fa;
+  --color-text-secondary: #bdc6da;
+  /* Held to 4.5:1 against surface-2, the lightest dark surface text lands on
+     (the Leaflet attribution strip sits there). */
+  --color-text-tertiary: #aeb7cb;
 
-  --color-accent: #2563eb;
-  --color-accent-soft: #2563eb1a;
-  --color-on-accent: #ffffff;
+  --color-accent: #a394f5;
+  --color-accent-soft: #a394f524;
+  --color-on-accent: #1b2033;
+  /* On dark the fill already clears AA against its own label, so the text tier
+     only has to stay legible on the surfaces it can land on. */
+  --color-accent-text: #b5a9f7;
 
-  /* Darkened for contrast on white. */
-  --color-up: #059669;
-  --color-degraded: #b45309;
-  --color-down: #dc2626;
-  --color-paused: #7b8798;
+  /* Brighter than the light theme: on dark, a mid-tone green goes muddy.
+     Every one of these is solved to clear 4.5:1 against surface-2, the
+     lightest dark surface text can sit on. */
+  --color-up: #4ade80;
+  --color-degraded: #fbbf24;
+  --color-down: #fc96a4;
+  --color-paused: #aeb7cb;
 
-  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -16px rgb(15 23 42 / 0.18);
-  --shadow-pop: 0 8px 40px -12px rgb(15 23 42 / 0.22);
+  --clay-shadow-out: 0 4px 10px rgb(10 12 22 / 0.55), 0 14px 30px -14px rgb(10 12 22 / 0.7);
+  --clay-shadow-in: inset -5px -5px 10px rgb(14 17 30 / 0.55);
+  --clay-shadow-light: inset 5px 5px 10px rgb(255 255 255 / 0.07);
 
-  --chart-up: #059669;
-  --chart-degraded: #b45309;
-  --chart-down: #dc2626;
-  --chart-accent: #2563eb;
-  --chart-grid: #e3e8ef;
+  --shadow-tile: 0 3px 8px rgb(10 12 22 / 0.5), 0 10px 20px -10px rgb(10 12 22 / 0.6),
+    inset -3px -3px 7px rgb(14 17 30 / 0.5), inset 3px 3px 7px rgb(255 255 255 / 0.07);
+  --shadow-pill: 0 3px 8px rgb(10 12 22 / 0.5), inset -2px -2px 5px rgb(14 17 30 / 0.45),
+    inset 2px 2px 5px rgb(255 255 255 / 0.07);
+  --shadow-pop: 0 12px 36px -10px rgb(10 12 22 / 0.75);
+  --shadow-inset: inset 4px 4px 9px rgb(14 17 30 / 0.55), inset -4px -4px 9px rgb(255 255 255 / 0.06);
 
-  --bg-wash-a: none;
-  --bg-wash-b: none;
+  --chart-up: #4ade80;
+  --chart-degraded: #fbbf24;
+  --chart-down: #fc96a4;
+  --chart-accent: #b5a9f7;
+  --chart-grid: #414a68;
+
+  --bg-wash-a: radial-gradient(900px 520px at 12% -10%, #34305c 0%, transparent 60%);
+  --bg-wash-b: radial-gradient(760px 440px at 96% -6%, #1f3a5c 0%, transparent 58%);
 }
 
 * {
@@ -167,8 +228,13 @@ body {
     var(--color-surface-0);
   background-attachment: fixed;
   color: var(--color-text-primary);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  /*
+   * ui-rounded resolves to SF Pro Rounded on Apple platforms and to the
+   * system UI font elsewhere. Deliberately not a web font: the app is built to
+   * run with zero third-party requests, and one font file would cost more than
+   * every icon in the interface combined.
+   */
+  font-family: ui-rounded, 'SF Pro Rounded', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   font-synthesis-weight: none;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -204,14 +270,44 @@ body {
   border: 0;
 }
 
+/* ------------------------------------------------------------------ clay */
+
+/*
+ * The base clay surface.
+ *
+ * `tile` rather than `raised` — this is the default depth for anything that is
+ * a list item or a group of fields. Panels that are genuinely the subject of
+ * the screen opt up to `raised`.
+ */
+.clay {
+  background: var(--color-surface-1);
+  border-radius: var(--radius-tile);
+  box-shadow: var(--shadow-tile);
+}
+
+.clay-raised {
+  background: var(--color-surface-1);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-raised);
+}
+
+/*
+ * A well. Pressed *into* the surface — the inner shadows swap sides so the
+ * light appears to come from the lower right, which is the visual inverse of a
+ * raised shape and is what makes an input read as a hole you type into.
+ */
+.clay-inset {
+  background: var(--color-surface-2);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-inset);
+}
+
 /* ------------------------------------------------------------------ panels */
 
 .panel {
-  background: color-mix(in srgb, var(--color-surface-1) 88%, transparent);
-  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-1);
   border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-panel);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-raised);
 }
 
 .panel-header {
@@ -219,19 +315,19 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: 18px 24px 4px;
 }
 
 .panel-title {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--color-text-primary);
 }
 
 .panel-subtitle {
   font-size: 12px;
+  font-weight: 500;
   color: var(--color-text-tertiary);
 }
 
@@ -304,18 +400,20 @@ body {
   );
   background-size: 800px 100%;
   animation: shimmer 1.6s linear infinite;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 /* ------------------------------------------------------------ map + leaflet */
 
 .leaflet-container {
-  background: var(--color-surface-0);
+  /* OSM tiles are a light style; in dark mode they are inverted (see below). */
+  background: var(--color-surface-2);
   font-family: inherit;
-  /* The map is a fixed-height panel; never let it grow unbounded. */
   height: 100%;
   width: 100%;
   z-index: 0;
+  /* Clay: the map sits in a well, so the tile plane gets a soft inner edge. */
+  border-radius: var(--radius-control);
 }
 
 /*
@@ -323,34 +421,34 @@ body {
  *
  * Inverting the raster tiles and rotating hue back turns OpenStreetMap's light
  * style into a dark one. Applied to the tile pane only, so our markers,
- * popups and controls (which are DOM siblings) keep their real colours — this
- * is why the filter is scoped here rather than on the whole container.
+ * popups and controls (which are DOM siblings) keep their real colours.
  *
  * WHY OSM AND NOT CARTO/STADIA
  * ----------------------------
  * CARTO's `dark_all` and `light_all` both return HTTP 200 with a watermarked
  * "API KEY REQUIRED" tile when no key is present, and Stadia returns 401. Both
  * were verified against the live endpoints. The status code is the trap: a
- * naive fetch check passes, the map still renders garbage. OSM is the only
+ * naive fetch check passes and the map still renders garbage. OSM is the only
  * hosted style that is genuinely keyless, which is why it stays.
- *
- * Light mode simply drops the filter — OSM is already a light basemap, and
- * inverting it there would produce a second wrong answer.
  */
 .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.94) contrast(0.86) saturate(0.55);
 }
 
+/* In light mode OSM is already correct — inverting it would be a second wrong
+   answer, not a fix. */
 [data-theme='light'] .leaflet-tile-pane {
   filter: none;
 }
 
-/* Leaflet ships light-mode chrome (attribution, zoom buttons). Align it. */
+/* Clay treatment for the Leaflet chrome. */
 .leaflet-control-attribution {
-  background: rgb(6 9 15 / 0.82) !important;
+  background: color-mix(in srgb, var(--color-surface-1) 88%, transparent) !important;
   color: var(--color-text-tertiary) !important;
   font-size: 10px !important;
-  border-radius: 6px 0 0 0;
+  border-radius: 999px;
+  padding: 2px 10px;
+  box-shadow: var(--shadow-pill);
 }
 
 .leaflet-control-attribution a {
@@ -358,33 +456,36 @@ body {
 }
 
 .leaflet-bar {
-  border: 1px solid var(--color-border-subtle) !important;
-  box-shadow: var(--shadow-panel) !important;
+  border: none !important;
+  box-shadow: var(--shadow-raised) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
 }
 
 .leaflet-bar a {
-  background: var(--color-surface-2) !important;
+  background: var(--color-surface-1) !important;
   color: var(--color-text-primary) !important;
   border-bottom-color: var(--color-border-subtle) !important;
+  transition: background-color 150ms var(--ease-out);
 }
 
 .leaflet-bar a:hover {
-  background: var(--color-surface-3) !important;
+  background: var(--color-surface-2) !important;
 }
 
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
-  background: var(--color-surface-2);
+  background: var(--color-surface-1);
   color: var(--color-text-primary);
+  border-radius: var(--radius-control);
   box-shadow: var(--shadow-pop);
 }
 
 .leaflet-popup-content-wrapper {
-  border: 1px solid var(--color-border-strong);
-  border-radius: 12px;
+  padding: 14px 16px;
 }
 
-/* Custom edge marker: a dot with an optional pulse ring. */
+/* Custom edge marker: a clay dot with an optional pulse ring. */
 .edge-marker {
   display: grid;
   place-items: center;
@@ -393,8 +494,10 @@ body {
 
 .edge-marker__dot {
   border-radius: 999px;
-  border: 1.5px solid rgb(255 255 255 / 0.9);
-  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55), 0 2px 8px rgb(0 0 0 / 0.6);
+  /* The white rim is what keeps a saturated status dot readable against both
+     the light OSM tiles and the inverted dark ones. */
+  border: 2px solid rgb(255 255 255 / 0.95);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35), 0 3px 10px rgb(0 0 0 / 0.25);
 }
 
 .edge-marker__pulse {
@@ -419,47 +522,44 @@ body {
 /*
  * Press feedback.
  *
- * The gap this closes: a form has one Save button and the page has no visible
- * change when it is pressed. A colour change on a control the finger is already
- * covering is not perceivable, so the whole form appears dead. Scaling the
- * element down by a few percent under the finger is immediate, physical, and
- * reads as "I touched that".
- *
- * `:active` alone is not enough — it only covers the duration of the mousedown.
- * `.is-pending` holds the pressed look for as long as the request is in flight,
- * which is what actually tells the user "this registered, and it is working".
+ * A form has one Save button and the page gives no sign the click registered.
+ * A colour change is invisible under a finger, so the shape deforms instead:
+ * squashing and springing back is the physical read that clay is built around.
  */
 .pressable {
   transition:
-    transform 120ms var(--ease-out),
-    opacity 120ms var(--ease-out),
-    background-color 150ms var(--ease-out),
-    border-color 150ms var(--ease-out);
+    transform 240ms var(--ease-spring),
+    box-shadow 240ms var(--ease-out),
+    background-color 180ms var(--ease-out),
+    color 180ms var(--ease-out);
+}
+
+.pressable:hover:not(:disabled) {
+  transform: translateY(var(--hover-lift));
 }
 
 .pressable:active:not(:disabled) {
   transform: scale(var(--press-scale));
+  transition-duration: 90ms;
 }
 
-/* Held while a mutation is in flight. */
+/* Held while a mutation is in flight, so the deformation lasts as long as the
+   request rather than just the mousedown. */
 .pressable.is-pending {
   transform: scale(var(--press-scale));
   cursor: progress;
+  transition-duration: 90ms;
 }
 
-/*
- * Toast entrance.
- *
- * Slides *and* fades. A pure fade is easy to miss when it happens in a corner
- * the user is not looking at; the 6px travel gives it a direction, so the eye
- * catches it peripherally even when it is off-centre.
- */
 @keyframes toast-in {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(6px) scale(0.98);
+    transform: translateY(14px) scale(0.92);
   }
-  to {
+  60% {
+    transform: translateY(-3px) scale(1.02);
+  }
+  100% {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
@@ -472,41 +572,33 @@ body {
   }
   to {
     opacity: 0;
-    transform: translateY(-4px) scale(0.98);
+    transform: translateY(-6px) scale(0.94);
   }
 }
 
 .toast-enter {
-  animation: toast-in 220ms var(--ease-out) both;
+  animation: toast-in 380ms var(--ease-spring) both;
 }
 
 .toast-exit {
-  animation: toast-out 160ms var(--ease-out) both;
+  animation: toast-out 180ms var(--ease-out) both;
 }
 
-/*
- * Content change.
- *
- * Used when a panel swaps from skeleton to content. Without it the swap is a
- * hard cut and the page appears to "recompose", which on a dashboard that
- * polls every 30s is genuinely irritating.
- */
 @keyframes content-in {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(6px) scale(0.99);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
 .content-enter {
-  animation: content-in 260ms var(--ease-out) both;
+  animation: content-in 340ms var(--ease-spring) both;
 }
 
-/* Row highlight when a new check lands on the dashboard. */
 @keyframes flash-row {
   from {
     background-color: var(--color-accent-soft);
@@ -520,7 +612,6 @@ body {
   animation: flash-row 900ms var(--ease-out) both;
 }
 
-/* Spinner rotation, kept here so every spinner animates identically. */
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -541,25 +632,25 @@ body {
     scroll-behavior: auto !important;
   }
 
-  /*
-   * Reduced motion must not remove feedback, only its movement. `.pressable`
-   * keeps a scale-free confirmation via opacity below.
-   */
+  /* Reduced motion removes the movement but keeps the acknowledgement —
+     otherwise a press becomes completely silent again. */
+  .pressable:hover:not(:disabled),
   .pressable:active:not(:disabled),
   .pressable.is-pending {
     transform: none;
-    opacity: 0.75;
+    opacity: 0.78;
   }
 }
 
-/* Keyboard focus must be obvious on a dark ground. */
+/* Keyboard focus must be obvious on a pastel ground, where a subtle ring
+   would be lost. */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  border-radius: 6px;
+  outline: 3px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 12px;
 }
 
-/* Scrollbars that do not fight the dark theme. */
+/* Scrollbars that match the clay rather than the OS. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--color-surface-4) transparent;
@@ -579,5 +670,7 @@ body {
 
 *::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-strong);
+  border-radius: 999px;
+  border: 3px solid transparent;
   background-clip: content-box;
 }

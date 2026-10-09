@@ -195,7 +195,7 @@ export function GroupsPage() {
     <div className="space-y-4">
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Groups</h1>
-        <p className="mt-1 text-sm text-[--color-text-tertiary]">
+        <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">
           Group monitors together and choose which groups appear on the public status page.
         </p>
       </div>
@@ -224,9 +224,9 @@ export function GroupsPage() {
                     )}
                   </div>
                   {group.description ? (
-                    <p className="mt-1 text-xs text-[--color-text-tertiary]">{group.description}</p>
+                    <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">{group.description}</p>
                   ) : null}
-                  <p className="mt-1.5 text-[11px] text-[--color-text-tertiary]">
+                  <p className="mt-1.5 text-[11px] text-[var(--color-text-tertiary)]">
                     {counts[group.id] ?? 0} monitor{(counts[group.id] ?? 0) === 1 ? '' : 's'}
                     {group.slug ? ` · /status/${group.slug}` : ''}
                   </p>
@@ -236,7 +236,7 @@ export function GroupsPage() {
                   {group.slug ? (
                     <Link
                       to={`/status/${group.slug}`}
-                      className="text-center text-xs text-[--color-text-secondary] hover:text-[--color-text-primary]"
+                      className="text-center text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
                     >
                       View page
                     </Link>
@@ -276,7 +276,7 @@ export function GroupsPage() {
               </div>
 
               {editingId === group.id ? (
-                <div className="mt-3 space-y-3 border-t border-[--color-border-subtle] pt-3">
+                <div className="mt-3 space-y-3 border-t border-[var(--color-border-subtle)] pt-3">
                   <Field label="Name" error={fieldErrors.name}>
                     <input
                       className={inputClass}
@@ -360,12 +360,12 @@ export function GroupsPage() {
             />
           </Field>
 
-          <label className="flex items-center gap-2 text-xs text-[--color-text-secondary]">
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
             <input
               type="checkbox"
               checked={isPublic}
               onChange={(e) => setIsPublic(e.target.checked)}
-              className="size-3.5 accent-[--color-accent]"
+              className="size-3.5 accent-[var(--color-accent)]"
             />
             Publish on the public status page
           </label>
@@ -377,9 +377,9 @@ export function GroupsPage() {
       </Panel>
 
       {publicGroups.length > 0 ? (
-        <p className="text-xs text-[--color-text-tertiary]">
+        <p className="text-xs text-[var(--color-text-tertiary)]">
           Live status page:{' '}
-          <Link to="/status" className="text-[--color-accent] hover:underline">
+          <Link to="/status" className="text-[var(--color-accent-text)] hover:underline">
             /status
           </Link>
         </p>

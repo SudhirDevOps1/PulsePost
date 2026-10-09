@@ -27,7 +27,7 @@ export function SettingsPage({ user, onUserChange }: { user: SessionUser; onUser
     <div className="space-y-5">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Settings</h1>
-        <p className="text-xs text-[--color-text-tertiary]">Your account, and the health of this instance.</p>
+        <p className="text-xs text-[var(--color-text-tertiary)]">Your account, and the health of this instance.</p>
       </header>
 
       <ProfilePanel user={user} onUserChange={onUserChange} />
@@ -215,7 +215,7 @@ function HealthPanel() {
       ) : report ? (
         <dl className="grid gap-3 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-xs text-[--color-text-tertiary]">Status</dt>
+            <dt className="text-xs text-[var(--color-text-tertiary)]">Status</dt>
             <dd className="mt-0.5 flex items-center gap-2">
               <span
                 className="inline-block h-2 w-2 rounded-full"
@@ -226,30 +226,30 @@ function HealthPanel() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-[--color-text-tertiary]">Version</dt>
+            <dt className="text-xs text-[var(--color-text-tertiary)]">Version</dt>
             <dd className="tabular mt-0.5">{report.version}</dd>
           </div>
           <div>
-            <dt className="text-xs text-[--color-text-tertiary]">Database</dt>
+            <dt className="text-xs text-[var(--color-text-tertiary)]">Database</dt>
             <dd className="tabular mt-0.5">
               {report.database.provider} · {report.database.dialect} · {report.database.server_version}
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-[--color-text-tertiary]">Database latency</dt>
+            <dt className="text-xs text-[var(--color-text-tertiary)]">Database latency</dt>
             <dd className="tabular mt-0.5">{report.database.latency_ms}ms</dd>
           </div>
           <div>
-            <dt className="text-xs text-[--color-text-tertiary]">Environment</dt>
+            <dt className="text-xs text-[var(--color-text-tertiary)]">Environment</dt>
             <dd className="mt-0.5">{report.environment}</dd>
           </div>
           <div>
-            <dt className="text-xs text-[--color-text-tertiary]">Checked</dt>
+            <dt className="text-xs text-[var(--color-text-tertiary)]">Checked</dt>
             <dd className="tabular mt-0.5">{new Date(report.timestamp).toLocaleTimeString()}</dd>
           </div>
         </dl>
       ) : (
-        <p className="text-sm text-[--color-text-tertiary]">
+        <p className="text-sm text-[var(--color-text-tertiary)]">
           Run a check to see the database provider, its latency and the deployed version.
         </p>
       )}

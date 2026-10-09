@@ -119,19 +119,17 @@ export function useToast(): ToastApi {
   return context;
 }
 
-const TONE_STYLE: Record<ToastTone, { border: string; icon: ReactNode }> = {
-  success: {
-    border: 'border-[--color-up]/35',
-    icon: <CheckIcon />,
-  },
-  error: {
-    border: 'border-[--color-down]/40',
-    icon: <AlertIcon />,
-  },
-  info: {
-    border: 'border-[--color-border-strong]',
-    icon: <Spinner size={13} />,
-  },
+/**
+ * `ring` rather than a border.
+ *
+ * An inset ring sits *inside* the shape, so it reads as a coloured edge on the
+ * clay rather than a line drawn around it — which is how a real clay object
+ * would be tinted at the rim.
+ */
+const TONE_STYLE: Record<ToastTone, { ring: string; icon: ReactNode }> = {
+  success: { ring: 'color-mix(in srgb, var(--color-up) 26%, transparent)', icon: <CheckIcon /> },
+  error: { ring: 'color-mix(in srgb, var(--color-down) 30%, transparent)', icon: <AlertIcon /> },
+  info: { ring: 'color-mix(in srgb, var(--color-accent) 24%, transparent)', icon: <Spinner size={14} /> },
 };
 
 function ToastViewport({
@@ -156,11 +154,12 @@ function ToastViewport({
         <div
           key={toast.id}
           role={toast.tone === 'error' ? 'alert' : 'status'}
-          className={`toast-enter pointer-events-auto flex items-start gap-2.5 rounded-[--radius-control] border bg-[--color-surface-1] px-3 py-2.5 text-sm shadow-[var(--shadow-pop)] ${TONE_STYLE[toast.tone].border}`}
+          className="toast-enter pointer-events-auto flex items-start gap-3 rounded-[var(--radius-tile)] bg-[var(--color-surface-1)] px-4 py-3 text-sm font-semibold text-[var(--color-text-primary)] shadow-[var(--shadow-pop)]"
+          style={{ boxShadow: 'var(--shadow-pop), inset 0 0 0 2px ' + TONE_STYLE[toast.tone].ring }}
         >
           <span className="mt-0.5 shrink-0">{TONE_STYLE[toast.tone].icon}</span>
 
-          <span className="min-w-0 flex-1 text-[--color-text-primary]">{toast.message}</span>
+          <span className="min-w-0 flex-1">{toast.message}</span>
 
           {toast.action ? (
             <button
@@ -169,7 +168,7 @@ function ToastViewport({
                 toast.action?.onClick();
                 onDismiss(toast.id);
               }}
-              className="pressable shrink-0 text-xs font-medium text-[--color-accent] hover:opacity-80"
+              className="pressable shrink-0 text-xs font-medium text-[var(--color-accent-text)] hover:opacity-80"
             >
               {toast.action.label}
             </button>
@@ -179,7 +178,7 @@ function ToastViewport({
             type="button"
             onClick={() => onDismiss(toast.id)}
             aria-label="Dismiss notification"
-            className="pressable shrink-0 text-[--color-text-tertiary] hover:text-[--color-text-primary]"
+            className="pressable shrink-0 text-[var(--color-text-tertiary)] hover:text-[var(--color-text-primary)]"
           >
             <CloseIcon />
           </button>

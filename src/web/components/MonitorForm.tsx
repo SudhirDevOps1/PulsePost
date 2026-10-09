@@ -133,10 +133,10 @@ export function MonitorForm({
               set('kind', kind);
               setShowDsl(kind === 'dsl');
             }}
-            className={`flex-1 rounded-[--radius-control] border px-3 py-2 text-sm transition-colors ${
+            className={`flex-1 rounded-[var(--radius-control)] border px-3 py-2 text-sm transition-colors ${
               values.kind === kind
-                ? 'border-[--color-accent] bg-[--color-accent-soft] text-[--color-text-primary]'
-                : 'border-[--color-border-subtle] bg-[--color-surface-2] text-[--color-text-secondary] hover:bg-[--color-surface-3]'
+                ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] text-[var(--color-text-primary)]'
+                : 'border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-3)]'
             }`}
           >
             {kind === 'http' ? 'Simple request' : 'Multi-step script'}
@@ -160,11 +160,11 @@ export function MonitorForm({
               required
             />
           </Field>
-          <details className="rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-2] p-3">
-            <summary className="cursor-pointer text-xs text-[--color-text-secondary]">
+          <details className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-3">
+            <summary className="cursor-pointer text-xs text-[var(--color-text-secondary)]">
               Show example
             </summary>
-            <pre className="mt-2 overflow-x-auto text-[11px] text-[--color-text-tertiary]">
+            <pre className="mt-2 overflow-x-auto text-[11px] text-[var(--color-text-tertiary)]">
               {DSL_PLACEHOLDER}
             </pre>
           </details>
@@ -216,12 +216,12 @@ export function MonitorForm({
               ))}
             </select>
           </Field>
-          <label className="flex items-center gap-2 text-xs text-[--color-text-secondary]">
+          <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
             <input
               type="checkbox"
               checked={values.follow_redirects}
               onChange={(e) => set('follow_redirects', e.target.checked)}
-              className="size-3.5 accent-[--color-accent]"
+              className="size-3.5 accent-[var(--color-accent)]"
             />
             Follow redirects (each hop is re-checked for safety)
           </label>
@@ -230,7 +230,7 @@ export function MonitorForm({
             <button
               type="button"
               onClick={() => setShowAdvanced(true)}
-              className="text-xs text-[--color-accent] hover:underline"
+              className="text-xs text-[var(--color-accent-text)] hover:underline"
             >
               Advanced options
             </button>
@@ -239,7 +239,7 @@ export function MonitorForm({
       )}
 
       {showAdvanced ? (
-        <div className="grid gap-3 rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-2] p-3 sm:grid-cols-2">
+        <div className="grid gap-3 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-3 sm:grid-cols-2">
           <Field label="Interval (seconds)" hint="Minimum 60 (Cloudflare cron limit)">
             <input
               className={inputClass}

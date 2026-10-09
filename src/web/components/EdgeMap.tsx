@@ -75,12 +75,12 @@ export function EdgeMap({ nodes, height = 340 }: { nodes: EdgeNode[]; height?: n
   if (nodes.length === 0) {
     return (
       <div
-        className="grid place-items-center rounded-[--radius-control] border border-dashed border-[--color-border-subtle] bg-[--color-surface-2] px-6 text-center"
-        style={{ height }}
+        className="clay-inset grid place-items-center px-6 text-center"
+        style={{ height, borderRadius: 'var(--radius-tile)' }}
       >
         <div>
-          <p className="text-sm font-medium text-[--color-text-primary]">No edge nodes yet</p>
-          <p className="mt-1 max-w-xs text-xs text-[--color-text-tertiary]">
+          <p className="text-sm font-medium text-[var(--color-text-primary)]">No edge nodes yet</p>
+          <p className="mt-1 max-w-xs text-xs text-[var(--color-text-tertiary)]">
             Nodes appear here after the first scheduled sweep records which Cloudflare colos
             executed your checks.
           </p>
@@ -90,7 +90,7 @@ export function EdgeMap({ nodes, height = 340 }: { nodes: EdgeNode[]; height?: n
   }
 
   return (
-    <div className="relative overflow-hidden rounded-[--radius-control]" style={{ height }}>
+    <div className="relative overflow-hidden rounded-[var(--radius-control)]" style={{ height }}>
       <MapContainer
         ref={containerRef}
         center={[26, 8]}
@@ -99,7 +99,7 @@ export function EdgeMap({ nodes, height = 340 }: { nodes: EdgeNode[]; height?: n
         maxZoom={8}
         scrollWheelZoom
         attributionControl
-        className="rounded-[--radius-control]"
+        className="rounded-[var(--radius-control)]"
         style={{ height, width: '100%' }}
       >
         {!tilesFailed ? (
@@ -160,7 +160,10 @@ export function EdgeMap({ nodes, height = 340 }: { nodes: EdgeNode[]; height?: n
 
       {tilesFailed ? (
         <div className="map-offline-note">
-          <span className="rounded-full border border-[--color-border-subtle] bg-[--color-surface-0]/85 px-3 py-1 text-[11px] text-[--color-text-secondary]">
+          <span
+            className="rounded-[var(--radius-pill)] bg-[var(--color-surface-1)]/92 px-4 py-1.5 text-[11px] font-bold text-[var(--color-text-secondary)]"
+            style={{ boxShadow: 'var(--shadow-pill)' }}
+          >
             Map tiles unavailable — showing edge positions only
           </span>
         </div>
@@ -244,7 +247,8 @@ function RegionLegend({ nodes }: { nodes: EdgeNode[] }) {
       {counts.map((entry) => (
         <span
           key={entry.region}
-          className="rounded-full border border-[--color-border-subtle] bg-[--color-surface-0]/80 px-2 py-0.5 text-[10px] text-[--color-text-secondary] backdrop-blur"
+          className="rounded-[var(--radius-pill)] bg-[var(--color-surface-1)]/92 px-3 py-1 text-[11px] font-bold text-[var(--color-text-secondary)] backdrop-blur"
+          style={{ boxShadow: 'var(--shadow-pill)' }}
         >
           {entry.region} · {entry.count}
         </span>

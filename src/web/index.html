@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -24,7 +24,9 @@
       (function () {
         try {
           var stored = localStorage.getItem('pulsepost.theme');
-          var pref = stored === 'light' || stored === 'dark' ? stored : 'system';
+          // Default is 'light' — the clay theme. 'system' is only used when the
+          // visitor explicitly picked it.
+          var pref = stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'light';
           var resolved =
             pref === 'system'
               ? window.matchMedia('(prefers-color-scheme: dark)').matches

@@ -69,7 +69,7 @@ export function NewMonitorPage() {
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
         <h1 className="text-lg font-semibold tracking-tight">Add monitor</h1>
-        <p className="mt-1 text-sm text-[--color-text-tertiary]">
+        <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">
           A simple URL check covers most cases. Switch to a multi-step script to monitor an
           authenticated flow.
         </p>
@@ -183,7 +183,7 @@ export function MonitorDetailPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link to="/" className="text-xs text-[--color-text-tertiary] hover:text-[--color-text-secondary]">
+          <Link to="/" className="text-xs text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]">
             ← Dashboard
           </Link>
           <div className="mt-1 flex items-center gap-2.5">
@@ -193,7 +193,7 @@ export function MonitorDetailPage() {
               {statusLabel(status?.current_status)}
             </Badge>
           </div>
-          <p className="mt-1 truncate-1 text-xs text-[--color-text-tertiary]">
+          <p className="mt-1 truncate-1 text-xs text-[var(--color-text-tertiary)]">
             {monitor.kind === 'dsl' ? 'Multi-step script' : `${monitor.method} ${redactUrl(monitor.url)}`}
           </p>
         </div>
@@ -272,7 +272,7 @@ export function MonitorDetailPage() {
 
       {monitor.script ? (
         <Panel title="Check script">
-          <pre className="max-h-80 overflow-auto rounded-[--radius-control] bg-[--color-surface-2] p-3 font-mono text-[11px] leading-relaxed text-[--color-text-secondary]">
+          <pre className="max-h-80 overflow-auto rounded-[var(--radius-control)] bg-[var(--color-surface-2)] p-3 font-mono text-[11px] leading-relaxed text-[var(--color-text-secondary)]">
             {monitor.script}
           </pre>
         </Panel>
@@ -305,7 +305,7 @@ function ColoHistory({ checks }: { checks: Check[] }) {
           .map(([colo, stats]) => (
             <span
               key={colo}
-              className="inline-flex items-center gap-2 rounded-lg border border-[--color-border-subtle] bg-[--color-surface-2] px-2.5 py-1.5 text-xs"
+              className="inline-flex items-center gap-2 rounded-lg border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-xs"
             >
               <span
                 className="size-1.5 rounded-full"
@@ -319,7 +319,7 @@ function ColoHistory({ checks }: { checks: Check[] }) {
                 }}
               />
               <span className="font-medium">{colo}</span>
-              <span className="tabular text-[--color-text-tertiary]">{stats.count}</span>
+              <span className="tabular text-[var(--color-text-tertiary)]">{stats.count}</span>
             </span>
           ))}
       </div>
@@ -330,7 +330,7 @@ function ColoHistory({ checks }: { checks: Check[] }) {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-[--color-text-tertiary]">{label}</p>
+      <p className="text-[10px] uppercase tracking-wide text-[var(--color-text-tertiary)]">{label}</p>
       <p className="tabular mt-1 text-lg font-medium">{value}</p>
     </div>
   );
@@ -338,8 +338,8 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-3 border-b border-[--color-border-subtle] pb-1.5">
-      <dt className="text-[--color-text-tertiary]">{label}</dt>
+    <div className="flex justify-between gap-3 border-b border-[var(--color-border-subtle)] pb-1.5">
+      <dt className="text-[var(--color-text-tertiary)]">{label}</dt>
       <dd className="tabular font-medium">{value}</dd>
     </div>
   );

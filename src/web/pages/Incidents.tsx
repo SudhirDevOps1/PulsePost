@@ -185,7 +185,7 @@ export function IncidentsPage() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold tracking-tight">Incidents</h1>
-          <p className="text-xs text-[--color-text-tertiary]">
+          <p className="text-xs text-[var(--color-text-tertiary)]">
             {openCount === 0 ? 'No open incidents' : `${openCount} open`}
             {openCount > 0 ? ' · ' : ''}
             {incidents.length} total
@@ -197,7 +197,7 @@ export function IncidentsPage() {
       </header>
 
       {notice ? (
-        <p className="text-xs text-[--color-up]" role="status">
+        <p className="text-xs text-[var(--color-up)]" role="status">
           {notice}
         </p>
       ) : null}
@@ -263,7 +263,7 @@ export function IncidentsPage() {
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-2 text-xs text-[--color-text-secondary]">
+        <label className="flex items-center gap-2 text-xs text-[var(--color-text-secondary)]">
           <input
             type="checkbox"
             checked={showResolved}
@@ -406,31 +406,31 @@ function IncidentCard({
     >
       <div className="space-y-4">
         {incident.updates && incident.updates.length > 0 ? (
-          <ol className="space-y-3 border-l border-[--color-border-subtle] pl-4">
+          <ol className="space-y-3 border-l border-[var(--color-border-subtle)] pl-4">
             {incident.updates.map((update) => (
               <li key={update.id} className="relative">
                 <span
-                  className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[--color-border-strong]"
+                  className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-[var(--color-border-strong)]"
                   aria-hidden="true"
                 />
                 <p className="flex flex-wrap items-baseline gap-2">
-                  <span className="text-xs font-medium text-[--color-text-primary]">
+                  <span className="text-xs font-medium text-[var(--color-text-primary)]">
                     {STATUS_LABEL[update.status] ?? update.status}
                   </span>
-                  <span className="tabular text-[11px] text-[--color-text-tertiary]">
+                  <span className="tabular text-[11px] text-[var(--color-text-tertiary)]">
                     {timeAgo(update.created_at)}
                   </span>
                 </p>
-                <p className="mt-0.5 text-sm text-[--color-text-secondary]">{update.message}</p>
+                <p className="mt-0.5 text-sm text-[var(--color-text-secondary)]">{update.message}</p>
               </li>
             ))}
           </ol>
         ) : (
-          <p className="text-sm text-[--color-text-tertiary]">No timeline updates yet.</p>
+          <p className="text-sm text-[var(--color-text-tertiary)]">No timeline updates yet.</p>
         )}
 
         {updating ? (
-          <div className="space-y-3 border-t border-[--color-border-subtle] pt-4">
+          <div className="space-y-3 border-t border-[var(--color-border-subtle)] pt-4">
             <Field label="Set status">
               <select
                 className={selectClass}
@@ -460,7 +460,7 @@ function IncidentCard({
             </div>
           </div>
         ) : (
-          <div className="flex gap-2 border-t border-[--color-border-subtle] pt-4">
+          <div className="flex gap-2 border-t border-[var(--color-border-subtle)] pt-4">
             <Button size="sm" onClick={onOpenUpdate}>
               {resolved ? 'Add update' : 'Post update'}
             </Button>

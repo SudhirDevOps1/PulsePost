@@ -104,13 +104,13 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
             {hasMonitors ? statusLabel(status.overall) : 'No monitors published'}
           </span>
         </div>
-        <p className="text-xs text-[--color-text-tertiary]">
+        <p className="text-xs text-[var(--color-text-tertiary)]">
           Updated {timeAgo(status.generated_at)} · refreshed every minute
         </p>
         {slug ? (
           <Link
             to="/status"
-            className="text-xs text-[--color-text-secondary] hover:text-[--color-text-primary]"
+            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
           >
             ← All services
           </Link>
@@ -118,27 +118,27 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
       </header>
 
       {activeIncidents.length > 0 ? (
-        <Panel title="Active incidents" className="border-[--color-degraded]/30">
+        <Panel title="Active incidents" className="border-[var(--color-degraded)]/30">
           <div className="space-y-3">
             {activeIncidents.map((incident) => (
-              <article key={incident.id} className="rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-2] p-3.5">
+              <article key={incident.id} className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-3.5">
                 <div className="flex flex-wrap items-center gap-2">
                   <StatusDot status="degraded" size={8} pulse={false} />
                   <h3 className="text-sm font-medium">{incident.title}</h3>
                   <Badge color="var(--color-degraded)">{incident.status}</Badge>
                   <Badge>{incident.impact}</Badge>
                 </div>
-                <p className="mt-1 text-xs text-[--color-text-tertiary]">
+                <p className="mt-1 text-xs text-[var(--color-text-tertiary)]">
                   Opened {timeAgo(incident.created_at)}
                 </p>
                 {incident.updates && incident.updates.length > 0 ? (
-                  <ol className="mt-3 space-y-2 border-l border-[--color-border-subtle] pl-3">
+                  <ol className="mt-3 space-y-2 border-l border-[var(--color-border-subtle)] pl-3">
                     {incident.updates.slice(-4).map((update) => (
                       <li key={update.id} className="text-xs">
-                        <span className="text-[--color-text-tertiary]">
+                        <span className="text-[var(--color-text-tertiary)]">
                           {timeAgo(update.created_at)} · {update.status}
                         </span>
-                        <p className="mt-0.5 text-[--color-text-secondary]">{update.message}</p>
+                        <p className="mt-0.5 text-[var(--color-text-secondary)]">{update.message}</p>
                       </li>
                     ))}
                   </ol>
@@ -157,11 +157,11 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
           actions={<StatusDot status={group.status} size={9} pulse={false} />}
         >
           {(group.monitors?.length ?? 0) === 0 ? (
-            <p className="py-4 text-center text-xs text-[--color-text-tertiary]">
+            <p className="py-4 text-center text-xs text-[var(--color-text-tertiary)]">
               No monitors in this group yet.
             </p>
           ) : (
-            <div className="divide-y divide-[--color-border-subtle]">
+            <div className="divide-y divide-[var(--color-border-subtle)]">
               {(group.monitors ?? []).map((monitor) => (
                 <div
                   key={monitor.id}
@@ -185,7 +185,7 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
                     <span style={{ color: `var(--color-${uptimeTone(monitor.uptime_24h)})` }}>
                       {formatUptime(monitor.uptime_24h)}
                     </span>
-                    <p className="text-[--color-text-tertiary]">24h</p>
+                    <p className="text-[var(--color-text-tertiary)]">24h</p>
                   </div>
                 </div>
               ))}
@@ -196,13 +196,13 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
 
       {groups.length === 0 ? (
         <Panel>
-          <p className="py-8 text-center text-sm text-[--color-text-tertiary]">
+          <p className="py-8 text-center text-sm text-[var(--color-text-tertiary)]">
             No public status pages yet. Mark a monitor group as public to publish one.
           </p>
         </Panel>
       ) : null}
 
-      <footer className="pt-2 text-center text-[11px] text-[--color-text-tertiary]">
+      <footer className="pt-2 text-center text-[11px] text-[var(--color-text-tertiary)]">
         {status.days}-day history · monitored from the edge · no third-party analytics
       </footer>
     </div>

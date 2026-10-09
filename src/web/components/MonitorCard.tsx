@@ -73,7 +73,7 @@ export function MonitorCard({
   }
 
   return (
-    <article className="panel group p-4 transition-colors hover:border-[--color-border-strong]">
+    <article className="clay p-5 transition-shadow duration-300 hover:shadow-[var(--shadow-raised)]">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         {/* Identity */}
         <div className="min-w-0 flex-1 basis-64">
@@ -113,21 +113,21 @@ export function MonitorCard({
                 <StatusDot status={status} />
                 <Link
                   to={`/monitors/${monitor.id}`}
-                  className="truncate-1 text-sm font-medium text-[--color-text-primary] hover:text-[--color-accent] hover:underline"
+                  className="truncate-1 text-[15px] font-bold tracking-tight text-[var(--color-text-primary)] transition-colors hover:text-[var(--color-accent-text)]"
                 >
                   {monitor.name}
                 </Link>
                 {monitor.kind === 'dsl' ? (
-                  <span className="text-[10px] text-[--color-text-tertiary]">multi-step</span>
+                  <span className="text-[10px] text-[var(--color-text-tertiary)]">multi-step</span>
                 ) : null}
                 {!monitor.active ? (
-                  <span className="text-[10px] uppercase tracking-wide text-[--color-text-tertiary]">
+                  <span className="text-[10px] uppercase tracking-wide text-[var(--color-text-tertiary)]">
                     paused
                   </span>
                 ) : null}
               </div>
 
-              <p className="mt-1 truncate-1 text-xs text-[--color-text-tertiary]">
+              <p className="mt-1.5 truncate-1 text-xs font-medium text-[var(--color-text-tertiary)]">
                 {monitor.kind === 'dsl' ? 'DSL script' : `${monitor.method} ${redactUrl(monitor.url)}`}
               </p>
             </>
@@ -153,18 +153,20 @@ export function MonitorCard({
           />
 
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-[--color-text-tertiary]">Latency</p>
-            <div className="mt-0.5 flex items-center gap-2">
-              <span className="tabular text-sm font-medium">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+              Latency
+            </p>
+            <div className="mt-1 flex items-center gap-2.5">
+              <span className="tabular text-lg font-bold">
                 {formatMs(monitor.last_check?.response_time_ms ?? null)}
               </span>
-              <Sparkline values={latency} width={72} height={18} />
+              <Sparkline values={latency} width={76} height={22} />
             </div>
           </div>
 
           {hasHistory ? (
             <div className="hidden w-32 lg:block">
-              <p className="mb-1 text-[10px] uppercase tracking-wide text-[--color-text-tertiary]">
+              <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-tertiary)]">
                 90 days
               </p>
               <UptimeStrip daily={daily} days={90} />
@@ -174,8 +176,8 @@ export function MonitorCard({
       </div>
 
       {/* Footer: always visible, never hover-gated. */}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-[--color-text-tertiary]">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium text-[var(--color-text-tertiary)]">
           <span>Checked {timeAgo(monitor.last_check?.checked_at)}</span>
           {monitor.last_check?.colo ? <span>· {monitor.last_check.colo}</span> : null}
           <span>· every {formatInterval(monitor.interval_seconds)}</span>
@@ -243,8 +245,10 @@ function Metric({
 }) {
   return (
     <div>
-      <p className="text-[10px] uppercase tracking-wide text-[--color-text-tertiary]">{label}</p>
-      <p className="tabular mt-0.5 text-sm font-medium" style={color ? { color } : undefined}>
+      <p className="text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-tertiary)]">
+        {label}
+      </p>
+      <p className="tabular mt-1 text-lg font-bold" style={color ? { color } : undefined}>
         {value}
       </p>
     </div>

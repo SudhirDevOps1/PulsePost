@@ -54,7 +54,7 @@ export function UptimeBars({
 
   if (slots.length === 0) {
     return (
-      <div className="grid h-[30px] place-items-center rounded bg-[--color-surface-2] text-xs text-[--color-text-tertiary]">
+      <div className="grid h-[30px] place-items-center rounded bg-[var(--color-surface-2)] text-xs text-[var(--color-text-tertiary)]">
         No history yet — the first check will appear here
       </div>
     );
@@ -116,7 +116,7 @@ export function UptimeBars({
       </div>
 
       {showAxis ? (
-        <div className="mt-1.5 flex justify-between text-[10px] text-[--color-text-tertiary]">
+        <div className="mt-1.5 flex justify-between text-[10px] text-[var(--color-text-tertiary)]">
           <span>{days}d ago</span>
           <span>today</span>
         </div>

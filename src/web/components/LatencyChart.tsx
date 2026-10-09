@@ -47,7 +47,7 @@ export function LatencyChart({
   if (!hasData) {
     return (
       <div
-        className="grid place-items-center rounded-[--radius-control] bg-[--color-surface-2] text-xs text-[--color-text-tertiary]"
+        className="grid place-items-center rounded-[var(--radius-control)] bg-[var(--color-surface-2)] text-xs text-[var(--color-text-tertiary)]"
         style={{ height }}
       >
         No response times recorded yet
@@ -113,7 +113,7 @@ export function LatencyChart({
         </ResponsiveContainer>
       </div>
 
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[--color-text-tertiary]">
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--color-text-tertiary)]">
         <span className="tabular">
           min {formatMs(min)} · avg{' '}
           {formatMs(Math.round(values.reduce((a, b) => a + b, 0) / values.length))} · max {formatMs(max)}
@@ -135,9 +135,9 @@ function LatencyTooltip({
   const point = payload[0]!.payload;
 
   return (
-    <div className="rounded-lg border border-[--color-border-strong] bg-[--color-surface-2] px-2.5 py-1.5 text-xs shadow-lg">
-      <div className="text-[--color-text-tertiary]">{point.label}</div>
-      <div className="tabular mt-0.5 font-medium text-[--color-text-primary]">
+    <div className="rounded-lg border border-[var(--color-border-strong)] bg-[var(--color-surface-2)] px-2.5 py-1.5 text-xs shadow-lg">
+      <div className="text-[var(--color-text-tertiary)]">{point.label}</div>
+      <div className="tabular mt-0.5 font-medium text-[var(--color-text-primary)]">
         {point.down ? (
           <span style={{ color: 'var(--color-down)' }}>Failed</span>
         ) : (

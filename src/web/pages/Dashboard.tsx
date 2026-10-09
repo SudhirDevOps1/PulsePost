@@ -251,7 +251,7 @@ export function Dashboard() {
                 one action. Style the Link instead of nesting it. */}
             <Link
               to="/monitors/new"
-              className="pressable inline-flex items-center rounded-[--radius-control] bg-[--color-accent] px-3.5 py-2 text-sm font-medium text-[--color-on-accent] hover:opacity-90"
+              className="pressable inline-flex items-center rounded-[var(--radius-control)] bg-[var(--color-accent)] px-3.5 py-2 text-sm font-medium text-[var(--color-on-accent)] hover:opacity-90"
             >
               Add monitor
             </Link>
@@ -304,7 +304,7 @@ export function Dashboard() {
             </Button>
           ) : null}
 
-          <span className="ml-auto text-[11px] text-[--color-text-tertiary]">
+          <span className="ml-auto text-[11px] text-[var(--color-text-tertiary)]">
             {visible.length} shown
           </span>
         </div>
@@ -348,7 +348,7 @@ export function Dashboard() {
 
 function UptimePreview({ daily }: { daily: DailyStatus[] }) {
   if (daily.length === 0) {
-    return <p className="text-xs text-[--color-text-tertiary]">Daily rollups appear after the first nightly job.</p>;
+    return <p className="text-xs text-[var(--color-text-tertiary)]">Daily rollups appear after the first nightly job.</p>;
   }
 
   const total = daily.reduce((sum, day) => sum + day.total_checks, 0);
@@ -356,9 +356,9 @@ function UptimePreview({ daily }: { daily: DailyStatus[] }) {
   const uptime = total === 0 ? null : (up / total) * 100;
 
   return (
-    <div className="rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-2] p-3">
+    <div className="rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-2)] p-3">
       <div className="flex items-baseline justify-between">
-        <span className="text-xs text-[--color-text-tertiary]">Daily uptime</span>
+        <span className="text-xs text-[var(--color-text-tertiary)]">Daily uptime</span>
         <span
           className="tabular text-sm font-medium"
           style={{ color: `var(--color-${toneOf(uptime)})` }}
@@ -366,7 +366,7 @@ function UptimePreview({ daily }: { daily: DailyStatus[] }) {
           {formatUptime(uptime)}
         </span>
       </div>
-      <p className="mt-1 text-[11px] text-[--color-text-tertiary]">
+      <p className="mt-1 text-[11px] text-[var(--color-text-tertiary)]">
         {daily.length} day{daily.length === 1 ? '' : 's'} · {total} checks
       </p>
     </div>
@@ -393,7 +393,7 @@ function FilterTabs({
   ];
 
   return (
-    <div className="flex gap-1 rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-1] p-0.5">
+    <div className="flex gap-1 rounded-[var(--radius-control)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-1)] p-0.5">
       {options.map((option) => (
         <button
           key={option.key}
@@ -401,8 +401,8 @@ function FilterTabs({
           onClick={() => onChange(option.key)}
           className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
             value === option.key
-              ? 'bg-[--color-surface-3] text-[--color-text-primary]'
-              : 'text-[--color-text-tertiary] hover:text-[--color-text-secondary]'
+              ? 'bg-[var(--color-surface-3)] text-[var(--color-text-primary)]'
+              : 'text-[var(--color-text-tertiary)] hover:text-[var(--color-text-secondary)]'
           }`}
         >
           {option.label}

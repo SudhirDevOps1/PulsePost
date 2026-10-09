@@ -201,13 +201,13 @@ export function ChannelsPage() {
     <div className="space-y-5">
       <header>
         <h1 className="text-lg font-semibold tracking-tight">Alerts</h1>
-        <p className="text-xs text-[--color-text-tertiary]">
+        <p className="text-xs text-[var(--color-text-tertiary)]">
           Where to be told when something breaks. A channel only alerts on monitors it is attached to.
         </p>
       </header>
 
       {notice ? (
-        <p className="text-xs text-[--color-up]" role="status">
+        <p className="text-xs text-[var(--color-up)]" role="status">
           {notice}
         </p>
       ) : null}
@@ -396,9 +396,9 @@ function ChannelCard({
         </div>
 
         {linksOpen ? (
-          <div className="space-y-3 border-t border-[--color-border-subtle] pt-4">
+          <div className="space-y-3 border-t border-[var(--color-border-subtle)] pt-4">
             {links.length === 0 ? (
-              <p className="text-sm text-[--color-text-tertiary]">
+              <p className="text-sm text-[var(--color-text-tertiary)]">
                 Not attached to anything yet — this channel will not alert.
               </p>
             ) : (
@@ -412,7 +412,7 @@ function ChannelCard({
                       {monitorName.get(link.monitor_id) ?? 'Unknown monitor'}
                     </span>
                     <span className="flex items-center gap-3">
-                      <span className="tabular text-[11px] text-[--color-text-tertiary]">
+                      <span className="tabular text-[11px] text-[var(--color-text-tertiary)]">
                         {link.notify_on} · after {link.downtime_threshold_s}s
                       </span>
                       <Button size="sm" variant="ghost" busy={busy} onClick={() => onDetach(link.monitor_id)}>
@@ -452,7 +452,7 @@ function ChannelCard({
               </div>
             </Field>
 
-            <p className="text-[11px] text-[--color-text-tertiary]">
+            <p className="text-[11px] text-[var(--color-text-tertiary)]">
               New subscriptions default to {NOTIFY_EVENTS.join(', ')} with no downtime grace period —
               adjust per monitor via the API until the subscription editor ships.
             </p>

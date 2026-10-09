@@ -14,7 +14,15 @@
  * it must not depend on this module having loaded.
  */
 
+/**
+ * The default is `light`, which is the clay theme.
+ *
+ * This used to be `system`. Under claymorphism the two themes are not
+ * equivalent — `light` is the intended look and `dark` is the reduced variant
+ * — so deferring to the OS would hand most visitors the compromise by default.
+ */
 export type ThemePreference = 'light' | 'dark' | 'system';
+export const DEFAULT_THEME: ThemePreference = 'light';
 export type ResolvedTheme = 'light' | 'dark';
 
 const STORAGE_KEY = 'pulsepost.theme';
@@ -36,14 +44,16 @@ export function resolveTheme(preference: ThemePreference): ResolvedTheme {
 }
 
 export function readPreference(): ThemePreference {
-  if (typeof localStorage === 'undefined') return 'system';
+  if (typeof localStorage === 'undefined') return DEFAULT_THEME;
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored === 'light' || stored === 'dark' || stored === 'system' ? stored : 'system';
+    return stored === 'light' || stored === 'dark' || stored === 'system'
+      ? stored
+      : DEFAULT_THEME;
   } catch {
     // Safari in private mode throws on localStorage access. A theme that does
     // not persist is a far smaller problem than a page that will not render.
-    return 'system';
+    return DEFAULT_THEME;
   }
 }
 

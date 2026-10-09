@@ -60,11 +60,14 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
 
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-50 border-b border-[--color-border-subtle] bg-[--color-surface-0]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 sm:gap-4">
+      <header className="sticky top-0 z-50 bg-[var(--color-surface-0)]/85 backdrop-blur-xl">
+        {/* Clay: the header is one continuous bar with a soft underside, not a
+            bordered strip. The shadow replaces the border so it still separates
+            from content scrolling underneath. */}
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:gap-4 sm:px-6" style={{ boxShadow: '0 6px 18px -12px rgb(146 162 197 / 0.5)' }}>
           <NavLink to="/" className="flex shrink-0 items-center gap-2.5">
             <Logo />
-            <span className="hidden text-sm font-semibold tracking-tight sm:inline">PulsePost</span>
+            <span className="hidden text-base font-extrabold tracking-tight sm:inline">PulsePost</span>
           </NavLink>
 
           {/*
@@ -87,13 +90,24 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
           </nav>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+            {/*
+              The overview pill waits for `xl`, not `lg`.
+
+              At exactly 1024 the nav comes online at the same moment this pill
+              would, and the two together overrun the header by ~18px -- which
+              pushes the whole document into horizontal scroll on every page.
+              The pill is the right thing to give up: it is a summary of what
+              /incidents and /status already say in full, and its title
+              attribute keeps the counts reachable on hover.
+            */}
             {overview ? (
               <span
-                className="hidden items-center gap-2 rounded-full border border-[--color-border-subtle] bg-[--color-surface-1] px-3 py-1.5 text-xs lg:inline-flex"
+                className="hidden items-center gap-2 rounded-[var(--radius-pill)] bg-[var(--color-surface-1)] px-3.5 py-2 text-xs font-bold xl:inline-flex"
+                style={{ color: statusColor(overall), boxShadow: 'var(--shadow-pill)' }}
                 title={`${overview.up} up · ${overview.degraded} degraded · ${overview.down} down`}
               >
-                <StatusDot status={overall} size={8} pulse={false} />
-                <span style={{ color: statusColor(overall) }}>{statusLabel(overall)}</span>
+                <StatusDot status={overall} size={9} pulse={false} />
+                <span>{statusLabel(overall)}</span>
               </span>
             ) : null}
 
@@ -102,7 +116,7 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="pressable rounded-md px-2 py-1.5 text-xs text-[--color-text-secondary] hover:bg-[--color-surface-2] lg:hidden"
+              className="pressable rounded-md px-2 py-1.5 text-xs text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] lg:hidden"
               aria-expanded={menuOpen}
             >
               Menu
@@ -115,7 +129,7 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
         </div>
 
         {menuOpen ? (
-          <nav className="flex flex-col gap-1 border-t border-[--color-border-subtle] px-4 py-2 lg:hidden">
+          <nav className="flex flex-col gap-1 border-t border-[var(--color-border-subtle)] px-4 py-2 lg:hidden">
             <NavItem to="/">Dashboard</NavItem>
             <NavItem to="/monitors/new">Add monitor</NavItem>
             <NavItem to="/groups">Groups</NavItem>
@@ -127,7 +141,7 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
             <button
               type="button"
               onClick={signOut}
-              className="rounded-lg px-3 py-2 text-left text-sm text-[--color-text-secondary] hover:bg-[--color-surface-2]"
+              className="rounded-lg px-3 py-2 text-left text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)]"
             >
               Sign out
             </button>
@@ -148,10 +162,10 @@ function NavItem({ to, children }: { to: string; children: React.ReactNode }) {
       to={to}
       end={to === '/'}
       className={({ isActive }) =>
-        `rounded-lg px-3 py-1.5 text-sm transition-colors ${
+        `pressable rounded-[var(--radius-pill)] px-3.5 py-1.5 text-sm transition-all ${
           isActive
-            ? 'bg-[--color-surface-2] text-[--color-text-primary]'
-            : 'text-[--color-text-secondary] hover:bg-[--color-surface-2] hover:text-[--color-text-primary]'
+            ? 'bg-[var(--color-surface-1)] font-bold text-[var(--color-text-primary)] shadow-[var(--shadow-pill)]'
+            : 'font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]'
         }`
       }
     >
@@ -173,7 +187,7 @@ function Logo() {
       <path
         d="M6 6.5h3a2 2 0 0 1 2 2v7a2 2 0 0 0 2 2h3.5M6 17.5h3a2 2 0 0 0 2-2v-7a2 2 0 0 1 2-2h3.5"
         stroke="var(--color-text-tertiary)"
-        strokeWidth="1.2"
+        strokeWidth="1.4"
         strokeLinecap="round"
       />
     </svg>

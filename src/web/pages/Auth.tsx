@@ -227,14 +227,14 @@ export function AuthCard({
           <div>
             <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
             {subtitle ? (
-              <p className="mt-1 text-sm text-[--color-text-tertiary]">{subtitle}</p>
+              <p className="mt-1 text-sm text-[var(--color-text-tertiary)]">{subtitle}</p>
             ) : null}
           </div>
         </div>
 
         <div className="panel p-5">{children}</div>
 
-        <p className="mt-4 text-center text-[11px] text-[--color-text-tertiary]">
+        <p className="mt-4 text-center text-[11px] text-[var(--color-text-tertiary)]">
           Self-hosted uptime monitoring · no telemetry
         </p>
       </div>

@@ -88,12 +88,12 @@ export function Panel({
         <header className="panel-header">
           <div className="min-w-0">
             {title ? <h2 className="panel-title">{title}</h2> : null}
-            {subtitle ? <p className="panel-subtitle mt-0.5">{subtitle}</p> : null}
+            {subtitle ? <p className="panel-subtitle mt-1">{subtitle}</p> : null}
           </div>
           {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
         </header>
       ) : null}
-      <div className={`p-4 ${bodyClassName}`}>{children}</div>
+      <div className={`p-5 ${bodyClassName}`}>{children}</div>
     </section>
   );
 }
@@ -127,15 +127,15 @@ export function StatCard({
         : STATUS_COLOR[tone];
 
   return (
-    <div className={`panel p-4 ${className ?? ''}`}>
+    <div className={`panel p-5 ${className ?? ''}`}>
       <div className="flex items-start justify-between gap-3">
         <p className="panel-subtitle truncate-1">{label}</p>
-        {icon ? <span className="shrink-0 text-[--color-text-tertiary]">{icon}</span> : null}
+        {icon ? <span className="shrink-0 text-[var(--color-text-tertiary)]">{icon}</span> : null}
       </div>
-      <p className="tabular mt-2 text-2xl font-semibold tracking-tight" style={{ color: toneColor }}>
+      <p className="tabular mt-2.5 text-3xl font-bold tracking-tight" style={{ color: toneColor }}>
         {value}
       </p>
-      {hint ? <p className="mt-1 text-xs text-[--color-text-tertiary]">{hint}</p> : null}
+      {hint ? <p className="mt-1.5 text-xs font-medium text-[var(--color-text-tertiary)]">{hint}</p> : null}
     </div>
   );
 }
@@ -152,11 +152,18 @@ export function Badge({
   const tint = color ?? 'var(--color-text-secondary)';
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium"
+      className="inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-1.5 text-xs font-bold"
       style={
         subtle
-          ? { color: tint, background: `color-mix(in srgb, ${tint} 14%, transparent)` }
-          : { color: 'var(--color-surface-0)', background: tint }
+          ? {
+              color: tint,
+              // A clay pill: the colour tints the surface and the shadow gives
+              // it volume, so a badge reads as a soft object rather than a
+              // flat label.
+              background: `color-mix(in srgb, ${tint} 13%, var(--color-surface-1))`,
+              boxShadow: `var(--shadow-pill), inset 0 0 0 1px color-mix(in srgb, ${tint} 22%, transparent)`,
+            }
+          : { color: 'var(--color-on-accent)', background: tint, boxShadow: 'var(--shadow-pill)' }
       }
     >
       {children}
@@ -191,14 +198,22 @@ export function Button({
   size?: 'sm' | 'md';
   busy?: boolean;
 } & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'>) {
-  const sizing = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-sm';
+  const sizing =
+    size === 'sm' ? 'px-4 py-2 text-xs rounded-[var(--radius-pill)]' : 'px-5 py-2.5 text-sm rounded-[var(--radius-pill)]';
 
   const variants: Record<ButtonVariant, string> = {
-    primary: 'bg-[--color-accent] text-[--color-on-accent] hover:opacity-90 font-medium',
+    // Primary is a solid clay block: the inner shadows are what make it look
+    // moulded rather than painted.
+    primary:
+      'bg-[var(--color-accent)] text-[var(--color-on-accent)] font-bold hover:brightness-105 shadow-[var(--shadow-pill)]',
+    // Secondary is the same shape in the card colour, so it sits on a clay
+    // surface without looking like a hole.
     secondary:
-      'border border-[--color-border-subtle] bg-[--color-surface-2] text-[--color-text-primary] hover:bg-[--color-surface-3]',
-    ghost: 'text-[--color-text-secondary] hover:bg-[--color-surface-2] hover:text-[--color-text-primary]',
-    danger: 'border border-[--color-down]/40 text-[--color-down] hover:bg-[--color-down]/10',
+      'bg-[var(--color-surface-1)] text-[var(--color-text-primary)] font-semibold shadow-[var(--shadow-pill)] hover:bg-[var(--color-surface-2)]',
+    ghost:
+      'bg-[var(--color-surface-2)] text-[var(--color-text-secondary)] font-semibold shadow-[var(--shadow-inset)] hover:text-[var(--color-text-primary)]',
+    danger:
+      'bg-[var(--color-surface-1)] text-[var(--color-down)] font-bold shadow-[var(--shadow-pill)] hover:bg-[var(--color-down)]/10',
   };
 
   return (
@@ -207,9 +222,9 @@ export function Button({
       disabled={rest.disabled || busy}
       aria-busy={busy || undefined}
       data-busy={busy ? '' : undefined}
-      className={`pressable inline-flex items-center justify-center gap-1.5 rounded-[--radius-control] disabled:cursor-not-allowed disabled:opacity-50 ${sizing} ${variants[variant]} ${className}`}
+      className={`pressable inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none ${sizing} ${variants[variant]} ${className}`}
     >
-      {busy ? <Spinner size={13} /> : null}
+      {busy ? <Spinner size={14} /> : null}
       {children}
     </button>
   );
@@ -252,9 +267,9 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-      <p className="text-sm font-medium text-[--color-text-primary]">{title}</p>
+      <p className="text-sm font-medium text-[var(--color-text-primary)]">{title}</p>
       {description ? (
-        <p className="max-w-sm text-sm text-[--color-text-tertiary]">{description}</p>
+        <p className="max-w-sm text-sm text-[var(--color-text-tertiary)]">{description}</p>
       ) : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>
@@ -265,14 +280,15 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
   return (
     <div
       role="alert"
-      className="flex items-start justify-between gap-3 rounded-[--radius-control] border border-[--color-down]/35 bg-[--color-down]/10 px-3 py-2.5 text-sm text-[--color-down]"
+      className="clay flex items-start justify-between gap-3 px-4 py-3 text-sm font-semibold"
+      style={{ color: 'var(--color-down)' }}
     >
       <span className="min-w-0">{message}</span>
       {onRetry ? (
         <button
           type="button"
           onClick={onRetry}
-          className="shrink-0 underline underline-offset-2 hover:opacity-80"
+          className="pressable shrink-0 rounded-[var(--radius-pill)] px-3 py-1 text-xs underline underline-offset-2 hover:opacity-80"
         >
           Retry
         </button>
@@ -281,6 +297,14 @@ export function ErrorNote({ message, onRetry }: { message: string; onRetry?: () 
   );
 }
 
+/**
+ * Clay field.
+ *
+ * Inputs are the one place clay is *pressed* rather than raised, so the label
+ * sits above a well the control is sunk into. The inner shadows are mirrored
+ * relative to a raised shape — light from the lower right — which is what makes
+ * the hole read as a hole.
+ */
 export function Field({
   label,
   hint,
@@ -295,22 +319,22 @@ export function Field({
   className?: string;
 }) {
   return (
-    <label className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-xs font-medium text-[--color-text-secondary]">{label}</span>
+    <label className={`flex flex-col gap-2 ${className}`}>
+      <span className="text-xs font-bold text-[var(--color-text-secondary)]">{label}</span>
       {children}
       {error ? (
-        <span className="text-xs text-[--color-down]">{error}</span>
+        <span className="text-xs font-semibold text-[var(--color-down)]">{error}</span>
       ) : hint ? (
-        <span className="text-xs text-[--color-text-tertiary]">{hint}</span>
+        <span className="text-xs font-medium text-[var(--color-text-tertiary)]">{hint}</span>
       ) : null}
     </label>
   );
 }
 
 export const inputClass =
-  'w-full rounded-[--radius-control] border border-[--color-border-subtle] bg-[--color-surface-2] px-3 py-2 text-sm text-[--color-text-primary] outline-none transition-colors placeholder:text-[--color-text-tertiary] focus:border-[--color-accent]';
+  'w-full rounded-[var(--radius-control)] bg-[var(--color-surface-2)] px-4 py-2.5 text-sm font-medium text-[var(--color-text-primary)] outline-none transition-shadow placeholder:text-[var(--color-text-tertiary)] placeholder:font-normal shadow-[var(--shadow-inset)] focus:shadow-[var(--shadow-inset)] focus:ring-2 focus:ring-[var(--color-accent)]/45';
 
-export const selectClass = `${inputClass} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2397a5bd%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:16px] bg-[right_0.6rem_center] bg-no-repeat pr-9`;
+export const selectClass = `${inputClass} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%2256648a%22 stroke-width=%222.5%22 stroke-linecap=%22round%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:18px] bg-[right_0.9rem_center] bg-no-repeat pr-11`;
 
 /**
  * Uptime percentage.
@@ -384,7 +408,7 @@ export function Sparkline({
   if (points.length < 2) {
     // A flat line through two points would imply a measurement that does not
     // exist. Say nothing instead of drawing something plausible.
-    return <span className={`inline-block text-[11px] text-[--color-text-tertiary] ${className}`}>—</span>;
+    return <span className={`inline-block text-[11px] text-[var(--color-text-tertiary)] ${className}`}>—</span>;
   }
 
   const max = Math.max(...points);

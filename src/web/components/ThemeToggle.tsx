@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import {
   applyTheme,
+  DEFAULT_THEME,
   onThemeChange,
   readPreference,
   setPreference,
@@ -23,8 +24,8 @@ import {
  * describes what clicking will do, not what is stored.
  */
 export function ThemeToggle({ className = '' }: { className?: string }) {
-  const [preference, setLocalPreference] = useState<ThemePreference>('system');
-  const [resolved, setResolved] = useState<ResolvedTheme>('dark');
+  const [preference, setLocalPreference] = useState<ThemePreference>(DEFAULT_THEME);
+  const [resolved, setResolved] = useState<ResolvedTheme>(DEFAULT_THEME === 'light' ? 'light' : 'dark');
 
   useEffect(() => {
     const stored = readPreference();
@@ -62,7 +63,7 @@ export function ThemeToggle({ className = '' }: { className?: string }) {
       onClick={cycle}
       title={label}
       aria-label={label}
-      className={`pressable inline-flex h-8 w-8 items-center justify-center rounded-[--radius-control] text-[--color-text-secondary] hover:bg-[--color-surface-2] hover:text-[--color-text-primary] ${className}`}
+      className={`pressable inline-flex h-8 w-8 items-center justify-center rounded-[var(--radius-control)] text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-2)] hover:text-[var(--color-text-primary)] ${className}`}
     >
       {resolved === 'dark' ? <SunIcon /> : <MoonIcon />}
     </button>

@@ -164,3 +164,80 @@ export interface PublicStatus {
   incidents: PublicIncident[];
   generated_at: string;
 }
+
+// --- incidents ---------------------------------------------------------------
+
+export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved';
+export type IncidentImpact = 'none' | 'minor' | 'major' | 'critical';
+
+export interface IncidentUpdate {
+  id: string;
+  incident_id: string;
+  status: IncidentStatus;
+  message: string;
+  created_at: string;
+}
+
+export interface Incident {
+  id: string;
+  title: string;
+  status: IncidentStatus;
+  impact: IncidentImpact;
+  group_id: string | null;
+  auto_created: boolean;
+  created_at: string;
+  updated_at: string;
+  resolved_at: string | null;
+  updates?: IncidentUpdate[];
+}
+
+// --- notification channels ---------------------------------------------------
+
+export type ChannelType = 'webhook' | 'slack' | 'discord';
+
+/** One monitor→channel subscription as returned inside a channel. */
+export interface ChannelMonitorLink {
+  monitor_id: string;
+  notify_on: string;
+  downtime_threshold_s: number;
+}
+
+export interface NotificationChannel {
+  id: string;
+  type: ChannelType;
+  name: string;
+  /** Always `'***'` on read — the real URL is write-only by design. */
+  config: string;
+  active: boolean;
+  created_at: string;
+  /** Present only on the list endpoint, which joins the link table. */
+  monitors?: ChannelMonitorLink[];
+}
+
+// --- audit -------------------------------------------------------------------
+
+export interface AuditEntry {
+  id: string;
+  user_id: string | null;
+  action: string;
+  target: string | null;
+  meta: string | null;
+  ip: string | null;
+  ok: boolean;
+  created_at: string;
+}
+
+// --- health ------------------------------------------------------------------
+
+export interface HealthReport {
+  ok: boolean;
+  database: {
+    provider: string;
+    dialect: string;
+    latency_ms: number;
+    server_version: string;
+  };
+  version: string;
+  environment: string;
+  timestamp: string;
+}

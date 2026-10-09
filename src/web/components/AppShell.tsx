@@ -4,6 +4,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { api, ApiError } from '../api.ts';
 import type { Overview } from '../types.ts';
 import { Button, StatusDot, statusColor, statusLabel } from './ui.tsx';
+import { ThemeToggle } from './ThemeToggle.tsx';
 
 /**
  * Authenticated app shell: header, nav, live status pill, and the routed view.
@@ -70,6 +71,10 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
             <NavItem to="/">Dashboard</NavItem>
             <NavItem to="/monitors/new">Add monitor</NavItem>
             <NavItem to="/groups">Groups</NavItem>
+            <NavItem to="/incidents">Incidents</NavItem>
+            <NavItem to="/channels">Alerts</NavItem>
+            <NavItem to="/team">Team</NavItem>
+            <NavItem to="/settings">Settings</NavItem>
             <NavItem to="/status">Status page</NavItem>
           </nav>
 
@@ -84,10 +89,12 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
               </span>
             ) : null}
 
+            <ThemeToggle />
+
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="rounded-md px-2 py-1.5 text-xs text-[--color-text-secondary] hover:bg-[--color-surface-2] sm:hidden"
+              className="pressable rounded-md px-2 py-1.5 text-xs text-[--color-text-secondary] hover:bg-[--color-surface-2] sm:hidden"
               aria-expanded={menuOpen}
             >
               Menu
@@ -104,6 +111,10 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
             <NavItem to="/">Dashboard</NavItem>
             <NavItem to="/monitors/new">Add monitor</NavItem>
             <NavItem to="/groups">Groups</NavItem>
+            <NavItem to="/incidents">Incidents</NavItem>
+            <NavItem to="/channels">Alerts</NavItem>
+            <NavItem to="/team">Team</NavItem>
+            <NavItem to="/settings">Settings</NavItem>
             <NavItem to="/status">Status page</NavItem>
             <button
               type="button"

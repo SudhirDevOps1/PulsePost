@@ -35,6 +35,10 @@ export function GroupsPage() {
   const [isPublic, setIsPublic] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
+  /** Which group is open in the inline editor, and its draft values. */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [edits, setEdits] = useState({ name: '', slug: '', description: '', theme: '' });
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -119,6 +123,70 @@ export function GroupsPage() {
     }
   }
 
+  /**
+   * Editing is inline rather than a separate screen: the group list is the only
+   * thing this page shows, and a rename is a two-field change. Opening a modal
+   * to retype a name is friction without focus.
+   */
+  async function saveEdits(group: MonitorGroup) {
+    setBusy(true);
+    setFieldErrors({});
+    try {
+      await api.updateGroup(group.id, {
+        name: edits.name,
+        slug: edits.slug || null,
+        description: edits.description || null,
+        theme: edits.theme || null,
+      });
+      setEditingId(null);
+      await load();
+    } catch (cause) {
+      if (cause instanceof ApiError) {
+        setFieldErrors(Object.fromEntries(cause.issues.map((i) => [i.field, i.message])));
+        setError(cause.message);
+      } else {
+        setError('Could not save the group');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function startEdit(group: MonitorGroup) {
+    setEditingId(group.id);
+    setEdits({
+      name: group.name,
+      slug: group.slug ?? '',
+      description: group.description ?? '',
+      theme: group.theme ?? '',
+    });
+    setFieldErrors({});
+  }
+
+  /**
+   * Ordering is a plain integer, so move-by-one is the whole feature. Reordering
+   * writes each affected row rather than swapping in the UI, because the list
+   * is sorted by the server and a local swap would snap back on the next load.
+   */
+  async function move(group: MonitorGroup, direction: -1 | 1) {
+    const index = groups.findIndex((g) => g.id === group.id);
+    const neighbour = groups[index + direction];
+    if (!neighbour) return;
+
+    setBusy(true);
+    try {
+      await Promise.all([
+        api.updateGroup(group.id, { display_order: neighbour.display_order }),
+        api.updateGroup(neighbour.id, { display_order: group.display_order }),
+      ]);
+      await load();
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Could not reorder');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <Skeleton className="h-64" />;
 
   const publicGroups = groups.filter((group) => group.is_public);
@@ -165,14 +233,97 @@ export function GroupsPage() {
                 </div>
 
                 <div className="flex shrink-0 flex-col gap-1.5">
+                  {group.slug ? (
+                    <Link
+                      to={`/status/${group.slug}`}
+                      className="text-center text-xs text-[--color-text-secondary] hover:text-[--color-text-primary]"
+                    >
+                      View page
+                    </Link>
+                  ) : null}
+                  <Button size="sm" variant="ghost" busy={busy} onClick={() => startEdit(group)}>
+                    Edit
+                  </Button>
                   <Button size="sm" variant="ghost" busy={busy} onClick={() => togglePublic(group)}>
                     {group.is_public ? 'Unpublish' : 'Publish'}
                   </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      busy={busy}
+                      aria-label={`Move ${group.name} up`}
+                      disabled={groups[0]?.id === group.id}
+                      onClick={() => void move(group, -1)}
+                    >
+                      ↑
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      busy={busy}
+                      aria-label={`Move ${group.name} down`}
+                      disabled={groups[groups.length - 1]?.id === group.id}
+                      onClick={() => void move(group, 1)}
+                    >
+                      ↓
+                    </Button>
+                  </div>
                   <Button size="sm" variant="danger" busy={busy} onClick={() => remove(group)}>
                     Delete
                   </Button>
                 </div>
               </div>
+
+              {editingId === group.id ? (
+                <div className="mt-3 space-y-3 border-t border-[--color-border-subtle] pt-3">
+                  <Field label="Name" error={fieldErrors.name}>
+                    <input
+                      className={inputClass}
+                      value={edits.name}
+                      onChange={(e) => setEdits({ ...edits, name: e.target.value })}
+                      maxLength={120}
+                    />
+                  </Field>
+                  <Field
+                    label="Slug"
+                    hint="Lowercase, numbers and dashes. Enables /status/<slug>."
+                    error={fieldErrors.slug}
+                  >
+                    <input
+                      className={inputClass}
+                      value={edits.slug}
+                      onChange={(e) => setEdits({ ...edits, slug: e.target.value })}
+                      placeholder="core-services"
+                    />
+                  </Field>
+                  <Field label="Description" error={fieldErrors.description}>
+                    <input
+                      className={inputClass}
+                      value={edits.description}
+                      onChange={(e) => setEdits({ ...edits, description: e.target.value })}
+                      maxLength={500}
+                    />
+                  </Field>
+                  <Field label="Theme" hint="Free-form label carried through to the public page.">
+                    <input
+                      className={inputClass}
+                      value={edits.theme}
+                      onChange={(e) => setEdits({ ...edits, theme: e.target.value })}
+                      placeholder="dark"
+                      maxLength={40}
+                    />
+                  </Field>
+                  <div className="flex gap-2">
+                    <Button variant="primary" size="sm" busy={busy} onClick={() => void saveEdits(group)}>
+                      Save
+                    </Button>
+                    <Button size="sm" onClick={() => setEditingId(null)}>
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </Panel>
           ))}
         </div>

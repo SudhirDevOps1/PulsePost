@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 
 import { api, ApiError } from '../api.ts';
 import type { PublicStatus } from '../types.ts';
@@ -28,36 +29,53 @@ import {
  *   3. No data reads as neutral, never as healthy.
  */
 export function PublicStatusPage() {
+  return <StatusView days={90} />;
+}
+
+/**
+ * Single-group public page.
+ *
+ * Backed by `GET /api/public/status/:slug`, which existed from the start but
+ * had no route to reach it — the groups screen could only print the slug as
+ * text. Same rendering rules as the aggregate page; only the fetch differs.
+ */
+export function PublicGroupStatusPage() {
+  const { slug } = useParams<{ slug: string }>();
+  if (!slug) return <StatusSkeleton />;
+  return <StatusView days={90} slug={slug} />;
+}
+
+/**
+ * Both public pages render from here.
+ *
+ * `slug` selects the endpoint; everything after the fetch is identical, which
+ * is what keeps the "never leak a URL, worst status wins, no data is neutral"
+ * rules in exactly one place.
+ */
+function StatusView({ days, slug }: { days: number; slug?: string }) {
   const [status, setStatus] = useState<PublicStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const load = useCallback(async () => {
+    try {
+      const next = slug
+        ? await api.publicGroupStatus(slug, days)
+        : await api.publicStatus(days);
+      setStatus(next);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof ApiError ? cause.message : 'Could not load status');
+    } finally {
+      setLoading(false);
+    }
+  }, [slug, days]);
+
   useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const next = await api.publicStatus(90);
-        if (!cancelled) {
-          setStatus(next);
-          setError(null);
-        }
-      } catch (cause) {
-        if (!cancelled) {
-          setError(cause instanceof ApiError ? cause.message : 'Could not load status');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
     void load();
-    const timer = setInterval(load, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, []);
+    const timer = setInterval(() => void load(), 60_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
   if (loading) return <StatusSkeleton />;
   if (error) return <div className="p-6"><ErrorNote message={error} /></div>;
@@ -89,6 +107,14 @@ export function PublicStatusPage() {
         <p className="text-xs text-[--color-text-tertiary]">
           Updated {timeAgo(status.generated_at)} · refreshed every minute
         </p>
+        {slug ? (
+          <Link
+            to="/status"
+            className="text-xs text-[--color-text-secondary] hover:text-[--color-text-primary]"
+          >
+            ← All services
+          </Link>
+        ) : null}
       </header>
 
       {activeIncidents.length > 0 ? (

@@ -125,6 +125,20 @@ export const api = {
 
   logout: () => request<{ ok: boolean }>('/auth/logout', { method: 'POST' }),
 
+  me: () => request<{ user: import('./types.ts').SessionUser }>('/auth/me'),
+
+  updateProfile: (input: { name?: string; email?: string }) =>
+    request<{ user: import('./types.ts').SessionUser }>('/auth/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+
+  changePassword: (input: { current_password: string; new_password: string }) =>
+    request<{ ok: boolean }>('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
   // --- monitors ---
   monitors: (params: { group?: string; status?: string; active?: boolean; limit?: number; include_uptime?: boolean } = {}) =>
     request<{ monitors: import('./types.ts').MonitorWithStatus[] }>(`/monitors${query(params)}`),
@@ -184,7 +198,120 @@ export const api = {
   deleteGroup: (id: string) =>
     request<{ ok: boolean; orphaned_monitors: number }>(`/groups/${id}`, { method: 'DELETE' }),
 
+  // --- incidents ---
+  incidents: (params: { include_resolved?: boolean } = {}) =>
+    request<{ incidents: import('./types.ts').Incident[] }>(`/incidents${query(params)}`),
+
+  incident: (id: string) =>
+    request<{ incident: import('./types.ts').Incident }>(`/incidents/${id}`),
+
+  createIncident: (input: Record<string, unknown>) =>
+    request<{ incident: import('./types.ts').Incident }>('/incidents', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateIncident: (id: string, input: Record<string, unknown>) =>
+    request<{ incident: import('./types.ts').Incident }>(`/incidents/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+
+  deleteIncident: (id: string) =>
+    request<{ ok: boolean }>(`/incidents/${id}`, { method: 'DELETE' }),
+
+  // --- notification channels ---
+  channels: () =>
+    request<{ channels: import('./types.ts').NotificationChannel[] }>('/channels'),
+
+  createChannel: (input: { type: string; name: string; url: string }) =>
+    request<{ channel: import('./types.ts').NotificationChannel }>('/channels', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateChannel: (id: string, input: Record<string, unknown>) =>
+    request<{ channel: import('./types.ts').NotificationChannel }>(`/channels/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+
+  deleteChannel: (id: string) => request<{ ok: boolean }>(`/channels/${id}`, { method: 'DELETE' }),
+
+  /** Attaches (or updates) a channel→monitor subscription. */
+  /**
+ * Attach a channel to a monitor.
+ *
+ * The body carries `channel_id`, not `monitor_id`: the channel id is already
+ * in the path, and the server's `linkChannelSchema` expects the channel. The
+ * backend has always been shaped this way.
+ */
+  /**
+ * Attach a channel to a monitor.
+ *
+ * `monitor_id` is a query parameter, not a body field — that is the only shape
+ * the route accepts. The body carries the per-monitor policy only.
+ */
+  linkChannel: (
+    id: string,
+    input: { monitor_id: string; notify_on?: string; downtime_threshold_s?: number },
+  ) =>
+    request<{ ok: boolean }>(`/channels/${id}/link${query({ monitor_id: input.monitor_id })}`, {
+      method: 'POST',
+      body: JSON.stringify({
+        channel_id: id,
+        notify_on: input.notify_on ?? 'down,up',
+        downtime_threshold_s: input.downtime_threshold_s ?? 0,
+      }),
+    }),
+
+  unlinkChannel: (id: string, monitorId: string) =>
+    request<{ ok: boolean }>(`/channels/${id}/link/${monitorId}`, { method: 'DELETE' }),
+
+  testChannel: (id: string) =>
+    request<{ ok: boolean; detail?: string }>(`/channels/${id}/test`, { method: 'POST' }),
+
+  // --- users ---
+  users: () => request<{ users: import('./types.ts').SessionUser[] }>('/users'),
+
+  createUser: (input: { name: string; email: string; password: string; role: string }) =>
+    request<{ user: import('./types.ts').SessionUser }>('/users', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+
+  updateUser: (id: string, input: Record<string, unknown>) =>
+    request<{ user: import('./types.ts').SessionUser }>(`/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+
+  deleteUser: (id: string) => request<{ ok: boolean }>(`/users/${id}`, { method: 'DELETE' }),
+
+  startTotp: (id: string) =>
+    request<{ secret: string; otpauth_uri: string }>(`/users/${id}/totp/start`, { method: 'POST' }),
+
+  confirmTotp: (id: string, code: string) =>
+    request<{ ok: boolean }>(`/users/${id}/totp/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
+  disableTotp: (id: string) =>
+    request<{ ok: boolean }>(`/users/${id}/totp/disable`, { method: 'POST' }),
+
   // --- public status ---
   publicStatus: (days = 90) =>
     request<import('./types.ts').PublicStatus>(`/public/status${query({ days })}`),
+
+  /** Per-group public page. Separate endpoint from the aggregate one. */
+  publicGroupStatus: (slug: string, days = 90) =>
+    request<import('./types.ts').PublicStatus>(`/public/status/${encodeURIComponent(slug)}${query({ days })}`),
+
+  /** The only public endpoint that returns incident timeline updates. */
+  publicIncidents: () =>
+    request<{ incidents: import('./types.ts').PublicIncident[] }>('/public/incidents'),
+
+  // --- health ---
+  health: () => request<import('./types.ts').HealthReport>('/health'),
 };

@@ -67,6 +67,12 @@ export interface MonitorWithStatus extends Monitor {
   uptime_24h: number | null;
   uptime_90d: number | null;
   avg_response_time_ms: number | null;
+  /**
+   * Recent response times, oldest first, for the dashboard sparkline.
+   * Present only when the request asked for `include_latency`. Failed checks
+   * are absent rather than zero, so the caller must tolerate gaps.
+   */
+  latency?: Array<number | null>;
 }
 
 export interface MonitorGroup {

@@ -43,6 +43,7 @@ monitorRoutes.get('/', validateQuery(listMonitorsQuerySchema), async (c) => {
     active: query.active,
     limit: query.limit,
     includeDaily: query.include_uptime,
+    includeLatency: query.include_latency,
     offset: query.offset,
     search: query.q,
     sort: query.sort,

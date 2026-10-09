@@ -221,6 +221,12 @@ export const listMonitorsQuerySchema = z
       .union([z.literal('true'), z.literal('false'), z.literal('1'), z.literal('0')])
       .transform((v) => v === 'true' || v === '1')
       .default(false),
+    // Adds a short recent-latency series per monitor for the dashboard
+    // sparklines. Costs one extra query, so it stays opt-in.
+    include_latency: z
+      .union([z.literal('true'), z.literal('false'), z.literal('1'), z.literal('0')])
+      .transform((v) => v === 'true' || v === '1')
+      .default(false),
   })
   .strict();
 

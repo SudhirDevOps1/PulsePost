@@ -107,6 +107,13 @@ export interface ListOptions {
   sort?: MonitorSortKey | undefined;
   order?: 'asc' | 'desc' | undefined;
   /**
+   * Attach a short recent-latency series per monitor, for dashboard sparklines.
+   * Costs one extra query, so it is opt-in like `includeDaily`.
+   */
+  includeLatency?: boolean | undefined;
+  /** Points kept per monitor in that series. */
+  latencyPoints?: number | undefined;
+  /**
    * Attach a per-monitor `daily` array for the 90-day bar.
    * Opt-in: at 200 monitors x 90 days this is ~18k numbers of JSON, and most
    * callers never look at it.
@@ -217,6 +224,41 @@ export async function listWithStatus(
   }
 
   const since24h = new Date(Date.now() - 86_400_000).toISOString();
+
+  /**
+   * Recent latency series, for the dashboard sparklines.
+   *
+   * Bounded by a 24-hour window rather than a row count: `LIMIT` applies to the
+   * whole result set, so `LIMIT 500` would return 500 checks for one monitor
+   * and nothing for the rest. Filtering by time and then slicing per monitor in
+   * TypeScript keeps the query portable and the rows bounded.
+   *
+   * `response_time_ms IS NOT NULL` matters twice over: it drops failed checks
+   * (which would otherwise render as a zero-latency dip, reading as "very
+   * fast"), and it keeps the payload small.
+   */
+  const latencyByMonitor = new Map<string, Array<number | null>>();
+  if (options.includeLatency) {
+    const latencyResult = await db.query<{ monitor_id: string; response_time_ms: number | null }>(
+      `SELECT monitor_id, response_time_ms
+         FROM checks
+        WHERE monitor_id IN (${placeholders})
+          AND checked_at >= ?
+          AND response_time_ms IS NOT NULL
+        ORDER BY checked_at ASC`,
+      [...ids, since24h],
+    );
+
+    const cap = options.latencyPoints ?? 24;
+    for (const row of latencyResult.rows) {
+      const series = latencyByMonitor.get(row.monitor_id) ?? [];
+      // One entry per monitor interval, oldest first. The cap is what stops a
+      // 60-second monitor producing 1,440 points in an 88px sparkline.
+      if (series.length >= cap) series.shift();
+      series.push(toNum(row.response_time_ms));
+      latencyByMonitor.set(row.monitor_id, series);
+    }
+  }
   const sinceWindow = new Date(
     Date.now() - (options.uptimeDays ?? 90) * 86_400_000,
   ).toISOString();
@@ -320,6 +362,7 @@ export async function listWithStatus(
       uptime_90d: uptime(longById.get(monitor.id) ?? rollupById.get(monitor.id)),
       avg_response_time_ms: avgResponse.get(monitor.id) ?? null,
       ...(options.includeDaily ? { daily: dailyByMonitor.get(monitor.id) ?? [] } : {}),
+      ...(options.includeLatency ? { latency: latencyByMonitor.get(monitor.id) ?? [] } : {}),
     };
   });
 

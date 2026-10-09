@@ -140,8 +140,26 @@ export const api = {
     }),
 
   // --- monitors ---
-  monitors: (params: { group?: string; status?: string; active?: boolean; limit?: number; include_uptime?: boolean } = {}) =>
-    request<{ monitors: import('./types.ts').MonitorWithStatus[] }>(`/monitors${query(params)}`),
+  monitors: (
+    params: {
+      group?: string;
+      status?: string;
+      active?: boolean;
+      limit?: number;
+      offset?: number;
+      q?: string;
+      sort?: 'name' | 'created_at' | 'updated_at';
+      order?: 'asc' | 'desc';
+      include_uptime?: boolean;
+      include_latency?: boolean;
+    } = {},
+  ) =>
+    request<{
+      monitors: import('./types.ts').MonitorWithStatus[];
+      limit: number;
+      offset: number;
+      has_more: boolean;
+    }>(`/monitors${query(params)}`),
 
   overview: () => request<{ overview: import('./types.ts').Overview }>('/monitors/overview'),
 

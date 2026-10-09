@@ -6,6 +6,7 @@ import type { DailyStatus, EdgeNode, MonitorWithStatus, Overview } from '../type
 import { EdgeMap } from '../components/EdgeMap.tsx';
 import { LatencyChart } from '../components/LatencyChart.tsx';
 import { MonitorCard } from '../components/MonitorCard.tsx';
+import { useToast } from '../components/Toast.tsx';
 import {
   Button,
   EmptyState,
@@ -15,6 +16,8 @@ import {
   StatCard,
   formatMs,
   formatUptime,
+  inputClass,
+  selectClass,
   timeAgo,
   uptimeTone,
 } from '../components/ui.tsx';
@@ -35,6 +38,12 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'down' | 'degraded'>('all');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<'name' | 'created_at' | 'updated_at'>('created_at');
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc');
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setError(null);
@@ -42,7 +51,14 @@ export function Dashboard() {
       // The three list endpoints are independent; run them together.
       const [overviewResult, monitorsResult, edgeResult] = await Promise.all([
         api.overview(),
-        api.monitors({ limit: 200, include_uptime: true }),
+        api.monitors({
+          limit: 200,
+          include_uptime: true,
+          include_latency: true,
+          q: debouncedSearch || undefined,
+          sort,
+          order,
+        }),
         api.edge(),
       ]);
 
@@ -66,7 +82,19 @@ export function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [debouncedSearch, sort, order]);
+
+  /**
+   * Search is debounced before it reaches the query.
+   *
+   * Without this every keystroke would refetch three endpoints, and the 30s
+   * polling timer would restart on each one — so typing a five-letter query
+   * fires five immediate reloads that race each other.
+   */
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     void load();
@@ -75,14 +103,47 @@ export function Dashboard() {
   }, [load]);
 
   async function toggle(id: string) {
+    // Optimistic, as before: pausing should feel instant. `load()` below is the
+    // correction if the server disagrees.
     setMonitors((current) =>
       current.map((m) => (m.id === id ? { ...m, active: !m.active } : m)),
     );
+    setBusyId(id);
     try {
       await api.toggleMonitor(id);
       void load();
-    } catch {
+    } catch (cause) {
+      const message = cause instanceof ApiError ? cause.message : 'Could not change that monitor';
+      toast.error(message);
       void load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function rename(id: string, name: string) {
+    setBusyId(id);
+    try {
+      await api.updateMonitor(id, { name });
+      toast.success(`Renamed to "${name}"`);
+      void load();
+    } catch (cause) {
+      toast.error(cause instanceof ApiError ? cause.message : 'Could not rename the monitor');
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function remove(monitor: MonitorWithStatus) {
+    setBusyId(monitor.id);
+    try {
+      await api.deleteMonitor(monitor.id);
+      toast.success(`Deleted "${monitor.name}"`);
+      void load();
+    } catch (cause) {
+      toast.error(cause instanceof ApiError ? cause.message : 'Could not delete the monitor');
+    } finally {
+      setBusyId(null);
     }
   }
 
@@ -103,6 +164,7 @@ export function Dashboard() {
       {/* --- headline --- */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <StatCard
+          className="min-w-0"
           label="Overall"
           value={overview ? statusWord(overview) : '—'}
           tone={
@@ -141,12 +203,20 @@ export function Dashboard() {
         />
       </section>
 
-      {/* --- map + latency --- */}
+      {/*
+        --- map + latency ---
+
+        `min-w-0` on both panels is load-bearing, not decoration. A grid item's
+        default `min-width` is `auto`, which means it refuses to shrink below
+        its content. Recharts measures its container once on mount, so an item
+        that cannot shrink leaves the chart at its original width and pushes
+        the entire page into a horizontal scroll on anything under 1024px.
+      */}
       <section className="grid gap-4 lg:grid-cols-5">
         <Panel
           title="Edge nodes"
           subtitle={`${nodes.length} colo${nodes.length === 1 ? '' : 's'} running checks`}
-          className="lg:col-span-3"
+          className="min-w-0 lg:col-span-3"
           bodyClassName="p-3"
         >
           <EdgeMap nodes={nodes} height={330} />
@@ -155,7 +225,7 @@ export function Dashboard() {
         <Panel
           title="Response time"
           subtitle={focusMonitor ? focusMonitor.name : 'no monitor selected'}
-          className="lg:col-span-2"
+          className="min-w-0 lg:col-span-2"
         >
           {focusMonitor ? (
             <>
@@ -172,14 +242,71 @@ export function Dashboard() {
 
       {/* --- monitor list --- */}
       <section>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Monitors</h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <FilterTabs value={filter} onChange={setFilter} counts={monitors} />
-            <Button size="sm" variant="primary" onClick={() => undefined}>
-              <Link to="/monitors/new">Add monitor</Link>
-            </Button>
+            {/* A Link wrapping a Button is nested interactive content: two
+                focusable, screen-reader-announced controls where there is only
+                one action. Style the Link instead of nesting it. */}
+            <Link
+              to="/monitors/new"
+              className="pressable inline-flex items-center rounded-[--radius-control] bg-[--color-accent] px-3.5 py-2 text-sm font-medium text-[--color-on-accent] hover:opacity-90"
+            >
+              Add monitor
+            </Link>
           </div>
+        </div>
+
+        {/* Search and sort. Both run server-side, so they work the same whether
+            the list holds five monitors or two hundred. */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input
+            className={`${inputClass} max-w-56`}
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search name or URL"
+            aria-label="Search monitors"
+          />
+
+          <select
+            className={`${selectClass} w-auto`}
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            aria-label="Sort monitors by"
+          >
+            <option value="created_at">Newest first</option>
+            <option value="name">Name A–Z</option>
+            <option value="updated_at">Recently changed</option>
+          </select>
+
+          <Button
+            size="sm"
+            onClick={() => setOrder((current) => (current === 'asc' ? 'desc' : 'asc'))}
+            aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
+            title={order === 'asc' ? 'Ascending' : 'Descending'}
+          >
+            {order === 'asc' ? '↑' : '↓'}
+          </Button>
+
+          {search || sort !== 'created_at' || order !== 'desc' ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setSearch('');
+                setSort('created_at');
+                setOrder('desc');
+              }}
+            >
+              Reset
+            </Button>
+          ) : null}
+
+          <span className="ml-auto text-[11px] text-[--color-text-tertiary]">
+            {visible.length} shown
+          </span>
         </div>
 
         {visible.length === 0 ? (
@@ -203,7 +330,14 @@ export function Dashboard() {
         ) : (
           <div className="space-y-2.5">
             {visible.map((monitor) => (
-              <MonitorCard key={monitor.id} monitor={monitor} onToggle={toggle} />
+              <MonitorCard
+                key={monitor.id}
+                monitor={monitor}
+                onToggle={toggle}
+                onRename={rename}
+                onDelete={remove}
+                busy={busyId === monitor.id}
+              />
             ))}
           </div>
         )}

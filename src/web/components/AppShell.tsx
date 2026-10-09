@@ -61,13 +61,21 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
   return (
     <div className="min-h-dvh">
       <header className="sticky top-0 z-50 border-b border-[--color-border-subtle] bg-[--color-surface-0]/80 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 sm:px-6 sm:gap-4">
           <NavLink to="/" className="flex shrink-0 items-center gap-2.5">
             <Logo />
-            <span className="text-sm font-semibold tracking-tight">PulsePost</span>
+            <span className="hidden text-sm font-semibold tracking-tight sm:inline">PulsePost</span>
           </NavLink>
 
-          <nav className="hidden items-center gap-1 sm:flex" aria-label="Main">
+          {/*
+            The desktop nav is `lg:` and not `sm:`.
+
+            With eight items it needs roughly 640px of its own; showing it from
+            640px up pushed the header past the viewport and made the whole page
+            scroll sideways. Everything below `lg` uses the Menu button instead,
+            which is also the honest breakpoint for eight targets.
+          */}
+          <nav className="hidden items-center gap-0.5 lg:flex xl:gap-1" aria-label="Main">
             <NavItem to="/">Dashboard</NavItem>
             <NavItem to="/monitors/new">Add monitor</NavItem>
             <NavItem to="/groups">Groups</NavItem>
@@ -78,10 +86,10 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
             <NavItem to="/status">Status page</NavItem>
           </nav>
 
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
             {overview ? (
               <span
-                className="hidden items-center gap-2 rounded-full border border-[--color-border-subtle] bg-[--color-surface-1] px-3 py-1.5 text-xs sm:inline-flex"
+                className="hidden items-center gap-2 rounded-full border border-[--color-border-subtle] bg-[--color-surface-1] px-3 py-1.5 text-xs lg:inline-flex"
                 title={`${overview.up} up · ${overview.degraded} degraded · ${overview.down} down`}
               >
                 <StatusDot status={overall} size={8} pulse={false} />
@@ -94,20 +102,20 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
             <button
               type="button"
               onClick={() => setMenuOpen((open) => !open)}
-              className="pressable rounded-md px-2 py-1.5 text-xs text-[--color-text-secondary] hover:bg-[--color-surface-2] sm:hidden"
+              className="pressable rounded-md px-2 py-1.5 text-xs text-[--color-text-secondary] hover:bg-[--color-surface-2] lg:hidden"
               aria-expanded={menuOpen}
             >
               Menu
             </button>
 
-            <Button size="sm" variant="ghost" onClick={signOut} className="hidden sm:inline-flex">
+            <Button size="sm" variant="ghost" onClick={signOut} className="hidden lg:inline-flex">
               Sign out
             </Button>
           </div>
         </div>
 
         {menuOpen ? (
-          <nav className="flex flex-col gap-1 border-t border-[--color-border-subtle] px-4 py-2 sm:hidden">
+          <nav className="flex flex-col gap-1 border-t border-[--color-border-subtle] px-4 py-2 lg:hidden">
             <NavItem to="/">Dashboard</NavItem>
             <NavItem to="/monitors/new">Add monitor</NavItem>
             <NavItem to="/groups">Groups</NavItem>

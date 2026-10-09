@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="PulsePost">
+  <!--
+    PulsePost mark.
+
+    Three edge nodes converging on a pulse line — the same shape the in-app
+    header logo uses, redrawn on a 64-unit grid so it stays crisp at favicon
+    sizes.
+
+    Two details that matter at 16px:
+      - Strokes are 4 units (6.25% of the viewBox). Anything thinner anti-aliases
+        into mush once the browser downsamples.
+      - The pulse is the ONLY interior detail. The header version carries a
+        second overlapping path for a "double pulse" read; at favicon scale
+        that reads as a smudge, so it is dropped rather than scaled down.
+
+    Colours are inlined rather than referencing app tokens: a favicon is
+    fetched outside the document, so `var(--color-up)` has no meaning there.
+  -->
+  <rect width="64" height="64" rx="14" fill="#06090f" />
+  <circle cx="15" cy="18" r="5" fill="#34d399" />
+  <circle cx="15" cy="46" r="5" fill="#34d399" />
+  <circle cx="49" cy="32" r="5" fill="#5b8cff" />
+  <path
+    d="M22 18h6a6 6 0 016 6v4a6 6 0 006 6h9"
+    stroke="#97a5bd"
+    stroke-width="4"
+    stroke-linecap="round"
+    fill="none"
+  />
+  <path
+    d="M22 46h6a6 6 0 006-6v-4a6 6 0 016-6h9"
+    stroke="#97a5bd"
+    stroke-width="4"
+    stroke-linecap="round"
+    fill="none"
+  />
+</svg>

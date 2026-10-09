@@ -1,12 +1,43 @@
 <!doctype html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark light" />
-    <meta name="theme-color" content="#0b0f17" />
+    <meta name="theme-color" content="#0b0f17" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#fbfcfd" media="(prefers-color-scheme: light)" />
     <title>PulsePost</title>
     <meta name="description" content="Self-hosted uptime monitoring on Cloudflare's edge." />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <script>
+      /*
+       * Apply the stored theme before first paint.
+       *
+       * This has to be an inline script, not a module import. React has not
+       * hydrated when the stylesheet renders, so a light-mode user would get a
+       * full dark flash on every navigation. Setting one attribute here is the
+       * difference between "the app is dark" and "the app was black for 200ms".
+       */
+      (function () {
+        try {
+          var stored = localStorage.getItem('pulsepost.theme');
+          var pref = stored === 'light' || stored === 'dark' ? stored : 'system';
+          var resolved =
+            pref === 'system'
+              ? window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+              : pref;
+          document.documentElement.setAttribute('data-theme', resolved);
+          document.documentElement.style.colorScheme = resolved;
+        } catch (e) {
+          /* Private mode, or storage disabled. Dark remains the default. */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -166,6 +166,18 @@ export function Badge({
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
 
+/**
+ * Button.
+ *
+ * Three separate feedback channels, because a button that only changes colour
+ * feels dead when the finger covers it:
+ *   - `:active` scale  — instantaneous, under the finger
+ *   - `is-pending`     — held for the whole request, not just the mousedown
+ *   - spinner          — says work is happening, not that it finished
+ *
+ * `busy` maps to `is-pending` rather than replacing the label, so the button
+ * does not change width mid-click.
+ */
 export function Button({
   children,
   variant = 'secondary',
@@ -182,7 +194,7 @@ export function Button({
   const sizing = size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3.5 py-2 text-sm';
 
   const variants: Record<ButtonVariant, string> = {
-    primary: 'bg-[--color-accent] text-[--color-surface-0] hover:opacity-90 font-medium',
+    primary: 'bg-[--color-accent] text-[--color-on-accent] hover:opacity-90 font-medium',
     secondary:
       'border border-[--color-border-subtle] bg-[--color-surface-2] text-[--color-text-primary] hover:bg-[--color-surface-3]',
     ghost: 'text-[--color-text-secondary] hover:bg-[--color-surface-2] hover:text-[--color-text-primary]',
@@ -193,7 +205,9 @@ export function Button({
     <button
       {...rest}
       disabled={rest.disabled || busy}
-      className={`inline-flex items-center justify-center gap-1.5 rounded-[--radius-control] transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${sizing} ${variants[variant]} ${className}`}
+      aria-busy={busy || undefined}
+      data-busy={busy ? '' : undefined}
+      className={`pressable inline-flex items-center justify-center gap-1.5 rounded-[--radius-control] disabled:cursor-not-allowed disabled:opacity-50 ${sizing} ${variants[variant]} ${className}`}
     >
       {busy ? <Spinner size={13} /> : null}
       {children}
@@ -338,4 +352,86 @@ export function timeAgo(iso: string | null | undefined, now = Date.now()): strin
   const days = Math.round(hours / 24);
   if (days <= 7) return `${days}d ago`;
   return new Date(then).toLocaleDateString();
+}
+
+/**
+ * Sparkline.
+ *
+ * A ~20-point latency trace drawn inline. Not a chart component: no axes, no
+ * grid, no tooltip — at this size the shape *is* the information, and anything
+ * more would cost more pixels than it explains. Recharts would also drag a
+ * ~300 KB chunk into the dashboard list, which defeats the point of having a
+ * lightweight alternative.
+ *
+ * Failures are not coloured separately here. `avg_response_time_ms` is null on a
+ * failed check, so those samples become gaps in the line rather than dips to
+ * zero — a dip would read as "very fast", which is the opposite of the truth.
+ * The uptime bars beside it are what carry failure state.
+ */
+export function Sparkline({
+  values,
+  width = 88,
+  height = 24,
+  className = '',
+}: {
+  values: Array<number | null>;
+  width?: number;
+  height?: number;
+  className?: string;
+}) {
+  const points = values.filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+
+  if (points.length < 2) {
+    // A flat line through two points would imply a measurement that does not
+    // exist. Say nothing instead of drawing something plausible.
+    return <span className={`inline-block text-[11px] text-[--color-text-tertiary] ${className}`}>—</span>;
+  }
+
+  const max = Math.max(...points);
+  const min = Math.min(...points);
+  // Guard against a zero range: every sample identical would otherwise divide
+  // by zero and produce NaN coordinates, which render as nothing at all.
+  const range = max - min || 1;
+
+  const step = width / (values.length - 1);
+  const y = (value: number) => height - 2 - ((value - min) / range) * (height - 4);
+
+  const segments: string[] = [];
+  let current = '';
+  for (let index = 0; index < values.length; index += 1) {
+    const value = values[index];
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      // Gap in the data. Lift the pen so the line does not imply a connection
+      // across a missing sample.
+      if (current) segments.push(current);
+      current = '';
+      continue;
+    }
+    const command = current === '' ? 'M' : 'L';
+    current += `${command}${(index * step).toFixed(1)},${y(value).toFixed(1)}`;
+  }
+  if (current) segments.push(current);
+
+  return (
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      className={className}
+      aria-hidden="true"
+      role="presentation"
+    >
+      {segments.map((d, index) => (
+        <path
+          key={index}
+          d={d}
+          fill="none"
+          stroke="var(--color-accent)"
+          strokeWidth={1.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ))}
+    </svg>
+  );
 }

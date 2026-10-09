@@ -7,6 +7,10 @@ const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 export default defineConfig({
   root: r('./src/web'),
+  // Vite would otherwise look for `src/web/public`. Pointing it at the repo
+  // root keeps static assets (favicon, manifest, icons) where someone opening
+  // this repo expects to find them, rather than buried inside the SPA source.
+  publicDir: r('./public'),
   base: '/',
   plugins: [react(), tailwindcss()],
   resolve: {

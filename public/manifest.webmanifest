@@ -1,0 +1,19 @@
+{
+  "name": "PulsePost",
+  "short_name": "PulsePost",
+  "description": "Self-hosted uptime monitoring on Cloudflare's edge.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#06090f",
+  "theme_color": "#06090f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

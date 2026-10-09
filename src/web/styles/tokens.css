@@ -1,12 +1,31 @@
 @import 'tailwindcss';
 
 /**
- * Design tokens and component styles.
+ * Design tokens.
  *
  * Dark-first, because an uptime dashboard is most often left open on a wall
  * display or a second monitor, and because status colour reads better against a
- * dark ground. Everything is a CSS custom property so Recharts and inline
- * styles can read the same values without importing a JS theme object.
+ * dark ground. Light mode is a real, first-class theme — not an afterthought —
+ * and both are defined here as CSS custom properties so Recharts and inline
+ * SVG can read the same values without importing a JS theme object.
+ *
+ * HOW THEMING WORKS
+ * -----------------
+ * `@theme` emits each token as a variable on `:root`. Tailwind utilities
+ * reference those variables rather than inlining the values, so overriding the
+ * same names inside `[data-theme='light']` flips the entire app without a single
+ * component-level change. That is why utilities in this codebase are written
+ * `bg-[--color-surface-2]` and not `bg-surface-2`: the bracketed form always
+ * resolves through `var()`, so it follows the theme.
+ *
+ * `<html data-theme>` is set before first paint by the inline script in
+ * `index.html` — see `web/theme.ts` for the module side.
+ *
+ * ADDING A TOKEN
+ * --------------
+ * Put it in BOTH blocks. A token defined only in `@theme` will silently have
+ * no light-mode value, which reads as "the light theme is broken" rather than
+ * "someone forgot a variable".
  */
 
 @theme {
@@ -25,6 +44,16 @@
 
   --color-accent: #5b8cff;
   --color-accent-soft: #5b8cff1f;
+
+  /*
+   * Text drawn ON the accent colour.
+   *
+   * A dedicated token because the accent inverts between themes: dark mode
+   * uses a light blue that needs dark text, light mode a deep blue that needs
+   * white. Deriving it from `--color-surface-0` looks equivalent until someone
+   * tunes a surface ramp and every button quietly loses contrast.
+   */
+  --color-on-accent: #06090f;
 
   --color-up: #34d399;
   --color-degraded: #fbbf24;
@@ -51,6 +80,73 @@
   --chart-down: #fb7185;
   --chart-accent: #5b8cff;
   --chart-grid: #1c2637;
+
+  /*
+   * Ambient background wash.
+   *
+   * Two very wide, very soft radial gradients — close enough to invisible that
+   * they read as depth rather than decoration. Light mode drops them
+   * entirely: on a near-white ground they show up as grey smudges, which is
+   * the giveaway of a dark theme mechanically inverted.
+   */
+  --bg-wash-a: radial-gradient(1100px 560px at 8% -12%, #142238 0%, transparent 62%);
+  --bg-wash-b: radial-gradient(820px 480px at 102% -4%, #0f1c2e 0%, transparent 58%);
+
+  /*
+   * Feedback animations.
+   *
+   * `--press-scale` is what makes a button feel like it acknowledges the click
+   * *at the moment of the click*. Without it the only feedback is a colour
+   * change on an element the finger is already covering.
+   */
+  --press-scale: 0.97;
+}
+
+/*
+ * Light theme.
+ *
+ * Not a mechanical inversion. Status colours are darkened and hue-shifted so
+ * they still pass contrast against white — `#34d399` on white is 1.6:1 and
+ * effectively invisible, which would make "operational" and "down" look
+ * identical to anyone who does not already know the difference.
+ */
+[data-theme='light'] {
+  color-scheme: light;
+
+  --color-surface-0: #fbfcfd;
+  --color-surface-1: #ffffff;
+  --color-surface-2: #f4f6f9;
+  --color-surface-3: #e9edf3;
+  --color-surface-4: #dde3ec;
+
+  --color-border-subtle: #e3e8ef;
+  --color-border-strong: #c6cfdc;
+
+  --color-text-primary: #0d1420;
+  --color-text-secondary: #4a5666;
+  --color-text-tertiary: #7b8798;
+
+  --color-accent: #2563eb;
+  --color-accent-soft: #2563eb1a;
+  --color-on-accent: #ffffff;
+
+  /* Darkened for contrast on white. */
+  --color-up: #059669;
+  --color-degraded: #b45309;
+  --color-down: #dc2626;
+  --color-paused: #7b8798;
+
+  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.04), 0 8px 24px -16px rgb(15 23 42 / 0.18);
+  --shadow-pop: 0 8px 40px -12px rgb(15 23 42 / 0.22);
+
+  --chart-up: #059669;
+  --chart-degraded: #b45309;
+  --chart-down: #dc2626;
+  --chart-accent: #2563eb;
+  --chart-grid: #e3e8ef;
+
+  --bg-wash-a: none;
+  --bg-wash-b: none;
 }
 
 * {
@@ -66,8 +162,8 @@ body {
 
 body {
   background:
-    radial-gradient(1100px 560px at 8% -12%, #142238 0%, transparent 62%),
-    radial-gradient(820px 480px at 102% -4%, #0f1c2e 0%, transparent 58%),
+    var(--bg-wash-a),
+    var(--bg-wash-b),
     var(--color-surface-0);
   background-attachment: fixed;
   color: var(--color-text-primary);
@@ -229,9 +325,24 @@ body {
  * style into a dark one. Applied to the tile pane only, so our markers,
  * popups and controls (which are DOM siblings) keep their real colours — this
  * is why the filter is scoped here rather than on the whole container.
+ *
+ * WHY OSM AND NOT CARTO/STADIA
+ * ----------------------------
+ * CARTO's `dark_all` and `light_all` both return HTTP 200 with a watermarked
+ * "API KEY REQUIRED" tile when no key is present, and Stadia returns 401. Both
+ * were verified against the live endpoints. The status code is the trap: a
+ * naive fetch check passes, the map still renders garbage. OSM is the only
+ * hosted style that is genuinely keyless, which is why it stays.
+ *
+ * Light mode simply drops the filter — OSM is already a light basemap, and
+ * inverting it there would produce a second wrong answer.
  */
 .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.94) contrast(0.86) saturate(0.55);
+}
+
+[data-theme='light'] .leaflet-tile-pane {
+  filter: none;
 }
 
 /* Leaflet ships light-mode chrome (attribution, zoom buttons). Align it. */
@@ -305,6 +416,121 @@ body {
 
 /* ------------------------------------------------------------------ motion */
 
+/*
+ * Press feedback.
+ *
+ * The gap this closes: a form has one Save button and the page has no visible
+ * change when it is pressed. A colour change on a control the finger is already
+ * covering is not perceivable, so the whole form appears dead. Scaling the
+ * element down by a few percent under the finger is immediate, physical, and
+ * reads as "I touched that".
+ *
+ * `:active` alone is not enough — it only covers the duration of the mousedown.
+ * `.is-pending` holds the pressed look for as long as the request is in flight,
+ * which is what actually tells the user "this registered, and it is working".
+ */
+.pressable {
+  transition:
+    transform 120ms var(--ease-out),
+    opacity 120ms var(--ease-out),
+    background-color 150ms var(--ease-out),
+    border-color 150ms var(--ease-out);
+}
+
+.pressable:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+/* Held while a mutation is in flight. */
+.pressable.is-pending {
+  transform: scale(var(--press-scale));
+  cursor: progress;
+}
+
+/*
+ * Toast entrance.
+ *
+ * Slides *and* fades. A pure fade is easy to miss when it happens in a corner
+ * the user is not looking at; the 6px travel gives it a direction, so the eye
+ * catches it peripherally even when it is off-centre.
+ */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.toast-enter {
+  animation: toast-in 220ms var(--ease-out) both;
+}
+
+.toast-exit {
+  animation: toast-out 160ms var(--ease-out) both;
+}
+
+/*
+ * Content change.
+ *
+ * Used when a panel swaps from skeleton to content. Without it the swap is a
+ * hard cut and the page appears to "recompose", which on a dashboard that
+ * polls every 30s is genuinely irritating.
+ */
+@keyframes content-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.content-enter {
+  animation: content-in 260ms var(--ease-out) both;
+}
+
+/* Row highlight when a new check lands on the dashboard. */
+@keyframes flash-row {
+  from {
+    background-color: var(--color-accent-soft);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.flash-row {
+  animation: flash-row 900ms var(--ease-out) both;
+}
+
+/* Spinner rotation, kept here so every spinner animates identically. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 700ms linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -313,6 +539,16 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /*
+   * Reduced motion must not remove feedback, only its movement. `.pressable`
+   * keeps a scale-free confirmation via opacity below.
+   */
+  .pressable:active:not(:disabled),
+  .pressable.is-pending {
+    transform: none;
+    opacity: 0.75;
   }
 }
 

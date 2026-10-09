@@ -197,12 +197,24 @@ export const updateMonitorSchema = z
   })
   .strict();
 
+const monitorSortKeySchema = z.enum(['name', 'created_at', 'updated_at']);
+
 export const listMonitorsQuerySchema = z
   .object({
     group: z.string().uuid().optional(),
     status: monitorStatusSchema.optional(),
     active: z.coerce.boolean().optional(),
     limit: z.coerce.number().int().min(1).max(200).default(100),
+    offset: z.coerce.number().int().min(0).max(100_000).default(0),
+    // Case-insensitive substring match on name and URL.
+    //
+    // Capped at 48 because D1 rejects any `LIKE`/`GLOB` pattern over 50 bytes,
+    // and the pattern wraps the term in two `%` wildcards. A longer term would
+    // otherwise pass validation here and fail as a database error on the free
+    // tier — the worst place for a user typing an unusual search to find out.
+    q: z.string().trim().min(1).max(48).optional(),
+    sort: monitorSortKeySchema.default('created_at'),
+    order: z.enum(['asc', 'desc']).default('desc'),
     // Adds a per-monitor 90-day uptime array. Useful for the dashboard list,
     // wasteful for pickers and anything else that only needs current status.
     include_uptime: z
@@ -300,7 +312,13 @@ export const updateChannelSchema = z
 
 export const linkChannelSchema = z
   .object({
-    channel_id: z.string().uuid(),
+    /**
+     * The channel is identified by the path (`:id/link`), so this is optional
+     * and ignored when present. It is still accepted because the field used to
+     * be the only way to name a channel here, and existing clients may still
+     * send it — dropping it outright would turn those calls into 400s.
+     */
+    channel_id: z.string().uuid().optional(),
     notify_on: z
       .string()
       .trim()

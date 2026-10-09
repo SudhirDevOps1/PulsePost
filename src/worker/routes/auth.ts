@@ -9,7 +9,7 @@ import {
   SESSION_COOKIE,
   SESSION_COOKIE_INSECURE,
 } from '../auth/session.ts';
-import { hashPassword, needsRehash, verifyPassword } from '../auth/password.ts';
+import { ITERATIONS, hashPassword, needsRehash, verifyPassword } from '../auth/password.ts';
 import { decryptTotpSecret, verifyTotp } from '../auth/totp.ts';
 import { nowIso } from '../db/dialect.ts';
 import type { AppEnv } from '../middleware/context.ts';
@@ -372,10 +372,19 @@ authRoutes.patch('/profile', requireAuth('viewer'), validateJson(profileSchema),
 /**
  * A valid PBKDF2 hash of an unguessable value. Verifying against it keeps the
  * cost of a login attempt for a nonexistent account identical to a real one.
+ *
+ * The iteration count is interpolated from the same constant `hashPassword`
+ * uses. Hard-coding it here is how the two silently drift apart: a login for a
+ * missing account then becomes measurably cheaper than a real one, which is
+ * precisely the timing signal this exists to remove.
  */
-const DUMMY_HASH =
-  'pbkdf2$sha256$210000$AAAAAAAAAAAAAAAAAAAAAA==$' +
-  'ZG8gbm90IG1hdGNoIGFueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2E=';
+const DUMMY_HASH = [
+  'pbkdf2',
+  'sha256',
+  String(ITERATIONS),
+  'AAAAAAAAAAAAAAAAAAAAAA==',
+  'ZG8gbm90IG1hdGNoIGFueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2FueXRoaW5nL2E=',
+].join('$');
 
 function isEnabled(value: unknown): boolean {
   return value === true || value === 1 || value === '1' || value === 'true';

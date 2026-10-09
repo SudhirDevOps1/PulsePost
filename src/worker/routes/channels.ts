@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 
 import { validateJson, validateParam } from '../http/validate.ts';
 import { HttpError } from '../http/errors.ts';
@@ -180,13 +181,25 @@ channelRoutes.post(
     const channel = await db.query('SELECT id FROM notification_channels WHERE id = ?', [id]);
     if (channel.rows.length === 0) throw HttpError.notFound('Channel not found');
 
+    // The monitor comes from a query parameter, not the body: the schema was
+// written to carry the channel (which is already in the path), so the row was
+// being inserted with `monitor_id = channel.id` and never matching a real
+// monitor. Which monitor to attach was simply not reachable.
+    const monitorId = c.req.query('monitor_id');
+    if (!z.string().uuid().safeParse(monitorId).success) {
+      throw HttpError.badRequest('A valid monitor_id query parameter is required');
+    }
+
+    const monitor = await db.query('SELECT id FROM monitors WHERE id = ?', [monitorId]);
+    if (monitor.rows.length === 0) throw HttpError.notFound('Monitor not found');
+
     await db.execute(
       `INSERT INTO monitor_notifications (monitor_id, channel_id, notify_on, downtime_threshold_s)
        VALUES (?, ?, ?, ?)
        ON CONFLICT (monitor_id, channel_id) DO UPDATE SET
          notify_on = excluded.notify_on,
          downtime_threshold_s = excluded.downtime_threshold_s`,
-      [body.channel_id, id, body.notify_on, body.downtime_threshold_s],
+      [monitorId, id, body.notify_on, body.downtime_threshold_s],
     );
 
     return c.json({ ok: true });

@@ -6,17 +6,37 @@
  * rainbow-tabled from a single dump, and SHA-256 is far too fast to resist
  * offline guessing.
  *
- * We use PBKDF2-HMAC-SHA256 with a per-user random salt and 210,000
- * iterations. OWASP's Password Storage Cheat Sheet lists PBKDF2-HMAC-SHA256
- * at 600,000 iterations as the floor today; 210,000 keeps verification inside
- * the Workers CPU budget while remaining far above any practical attack rate.
- * The stored format is versioned so the cost can be raised later without
- * invalidating existing hashes.
+ * We use PBKDF2-HMAC-SHA256 with a per-user random salt, at the iteration
+ * count below. The stored format is versioned, so the cost can be raised later
+ * without invalidating existing hashes.
+ *
+ * On the cost: OWASP's Password Storage Cheat Sheet lists PBKDF2-HMAC-SHA256
+ * at 600,000 iterations as the floor today, which we would happily use, but
+ * 100,000 is the **hard ceiling of the platform**. workerd's WebCrypto rejects
+ * anything higher with
+ *
+ *   NotSupportedError: Pbkdf2 failed: iteration counts above 100000
+ *   are not supported (requested 210000).
+ *
+ * Node's WebCrypto has no such cap, so this limit is invisible to `pnpm test`
+ * and only shows up in production. That is exactly why the value lives in one
+ * exported constant instead of being spelled out at each call site.
  */
 
 const ALGORITHM = 'PBKDF2';
 const HASH = 'SHA-256';
-const ITERATIONS = 210_000;
+
+/**
+ * The work factor used for newly created hashes.
+ *
+ * Keep this at or below 100,000 — the workerd PBKDF2 ceiling. Raise it only
+ * after checking that Cloudflare has lifted the cap, because exceeding it makes
+ * *every* signup and login throw rather than merely weaken them.
+ *
+ * Exported so timing-equalisation hashes (`DUMMY_HASH`) cannot drift away from
+ * the real cost they are meant to imitate.
+ */
+export const ITERATIONS = 100_000;
 const KEY_LENGTH_BITS = 256;
 const SALT_BYTES = 16;
 
@@ -124,7 +144,15 @@ export async function verifyPassword(password: string, stored: string): Promise<
     return false;
   }
 
-  const actual = await derive(password, salt, iterations);
+  let actual: Uint8Array;
+  try {
+    actual = await derive(password, salt, iterations);
+  } catch {
+    // An unreadable hash must read as "wrong password", never as a 500. The
+    // realistic cause is an iteration count above the platform ceiling, which
+    // would otherwise turn every login into a server error.
+    return false;
+  }
   return constantTimeEqual(actual, expected);
 }
 

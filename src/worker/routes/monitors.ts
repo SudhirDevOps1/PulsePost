@@ -43,9 +43,21 @@ monitorRoutes.get('/', validateQuery(listMonitorsQuerySchema), async (c) => {
     active: query.active,
     limit: query.limit,
     includeDaily: query.include_uptime,
+    offset: query.offset,
+    search: query.q,
+    sort: query.sort,
+    order: query.order,
   });
 
-  return c.json({ monitors });
+  // Echo the paging window so the client can render controls without having to
+  // re-derive the server's own defaults. `has_more` is the usual trick for a
+  // LIMIT/OFFSET list that would rather not pay for a COUNT(*) per keystroke.
+  return c.json({
+    monitors,
+    limit: query.limit,
+    offset: query.offset,
+    has_more: monitors.length === query.limit,
+  });
 });
 
 monitorRoutes.get('/overview', async (c) => {

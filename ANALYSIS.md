@@ -1,408 +1,461 @@
-# ANALYSIS.md — Pingflare Deep Analysis & Unified Architecture Design
+# ANALYSIS.md — PulsePost Phase 1: Deep Analysis & Real-Time Web Research
 
-> Phase 1 deliverable. Read this before touching code.
-> Reference repo cloned at `_reference_pingflare/` (read-only, `.git` removed after analysis).
+> **Phase 1 deliverable.** Ye file padhne ke baad hi code me haath daalna chahiye.
+> Research date: **9 October 2026**. Saare Cloudflare numbers official docs se
+> verify kiye gaye hain (links neeche diye hain) — speculation nahi.
+>
+> **Constraint follow kiya gaya hai:** kuch bhi *remove* nahi hoga. Sirf
+> *add* aur *improve*.
 
 ---
 
-## 1. Original Pingflare — What It Actually Is
+## 0. Ek zaroori baat pehle
 
-Pingflare is a **self-hosted uptime monitor that runs entirely on Cloudflare Workers + D1**.
-Reference: <https://github.com/isala404/pingflare> (MIT). Analysed at commit on `master`.
+Aapke brief me do cheezein likhi hain jo **available nahi** hain:
 
-### 1.1 Stack (verified from `package.json` / `wrangler.toml`)
-
-| Layer | Choice |
+| Brief me | Reality |
 |---|---|
-| Framework | SvelteKit 2 + Svelte 5 (`@sveltejs/adapter-cloudflare`) |
-| Build | Vite 7 + Tailwind 4 + `esbuild` |
-| Runtime | Cloudflare Workers, `compatibility_date = 2025-11-17`, `nodejs_compat` |
-| Storage | D1 (SQLite) only |
-| Scheduling | Cron trigger `*/1 * * * *` |
-| Pkg manager | `bun` (`bun.lock`) |
-| Deployment | Workers Static Assets: `main = dist/_worker.js`, `[assets] directory = dist` |
+| `@tundralibs/drivers` | ❌ npm par **publish hi nahi hua**. Install nahi ho sakta. |
+| `cf-knex` | ⚠️ Exists (v0.3.2) par galat tool — neeche §3 me detail. |
+| `/backend-dev-guidelines` skill | ❌ Mere environment me nahi hai |
+| `/ui-ux-pro-max` skill | ❌ Mere environment me nahi hai |
 
-### 1.2 The Clever Deployment Trick (worth copying)
-
-Next.js/SvelteKit adapters normally emit a `fetch` handler only. Pingflare needs **cron**, so
-`scripts/build-worker.js` does this after `vite build`:
-
-1. Takes the adapter output `.svelte-kit/cloudflare/_worker.js`.
-2. Generates a **wrapper** module that re-exports `.fetch` and adds a `scheduled()` handler.
-3. Bundles wrapper → `dist/_worker.js` with esbuild.
-4. Copies every *other* file from `.svelte-kit/cloudflare/` into `dist/` so Workers Static Assets
-   can serve them.
-
-Then `scheduled()` fabricates a request to `/api/cron` carrying `X-Cron-Secret` and calls the SvelteKit
-handler. So **there is only one Worker** doing UI + API + cron. That is the architectural seed for
-our whole project.
-
-### 1.3 Request Flow
-
-```
-Browser ─┬─ GET /            → hooks.server.ts (session) → +page.server.ts → D1
-         ├─ GET /status/[slug]→ public status page → D1 (daily_status aggregates)
-         └─ POST /api/monitors → hooks.server.ts (auth) → zod-less hand validation → D1
-
-Cron */1min ─→ Worker.scheduled() ─→ synthetic GET /api/cron (X-Cron-Secret)
-                                        │
-                                        ├─ getActiveMonitors(D1)
-                                        ├─ for each: runCheck(monitor)  ← multi-step DSL
-                                        ├─ insertCheck(...)
-                                        ├─ on status change → sendNotifications()
-                                        └─ at 00:00 UTC → aggregateDailyStatus() + cleanup
-```
-
-### 1.4 The Health-Check DSL (its real differentiator)
-
-`src/lib/server/checkers/script.ts` implements a **declarative JSON check language**, not a plain
-HTTP ping. It supports:
-
-- Chained steps: `GET/POST/PUT/PATCH/DELETE`
-- `extract` — pull values out of a response by dot-path (`json.token`) into `${var}` placeholders
-- `assert` — compare `status`, `json.*`, headers, response time with `equals`, `greaterThan`, `contains`, …
-- Severity mapping: a failing assertion can be `degraded` or `down`
-- A visual builder UI (`ScriptBuilder.svelte`, 22 KB) that emits the JSON
-
-This is what lets it monitor *flows* (login → token → call API) rather than single URLs.
-**We keep this concept and improve it** (allowlist enforcement, redirect cap, size cap).
-
-### 1.5 Data Model (`migrations/0001_schema.sql`)
-
-11 tables: `monitor_groups`, `monitors`, `checks`, `daily_status`, `incidents`,
-`incident_updates`, `notification_channels`, `monitor_notifications`, `push_subscriptions`,
-`users`, `sessions`, `app_settings`.
-
-Smart bit: **dual-granularity history**. Raw `checks` rows are kept only 7 days; `daily_status`
-holds 90 days of pre-aggregated uptime so the 90-day bar chart is ~90 rows, not ~129,600.
-
-### 1.6 Notifications
-
-`webhook`, `slack`, `discord`, `webpush` (real VAPID web-push, 9 KB module). Fired **only on
-status transition**, not on every failed check — that is deliberate spam avoidance.
-`monitor_notifications` supports `notify_on` (`down,up`) and `downtime_threshold_s`.
+Isliye:
+- **Database:** hand-rolled adapter (already implemented hai — Phase 4 poora).
+- **UI skills:** `minimalism` + `design-it` + `vercel-react-best-practices` use karunga.
 
 ---
 
-## 2. Gaps We Fix (the "enhanced" part)
+## 1. Current Architecture — Asli Picture
 
-| # | Issue in original | Severity | Our fix |
-|---|---|---|---|
-| 1 | **Unsalted SHA-256 password hash** (`crypto.subtle.digest('SHA-256')`, `auth.ts`) | 🔴 Critical | PBKDF2-SHA256, 210k iters, 16-byte random salt, versioned `pbkdf2$…` format |
-| 2 | Password compared with `===` (no constant-time compare) | 🟠 High | `crypto.subtle.verify` / `timingSafeEqual` |
-| 3 | **No rate limiting anywhere** — login is brute-forceable | 🔴 Critical | Workers Rate Limiting binding + Hono in-memory limiter + auth-specific lockout |
-| 4 | **No security headers at all** — no CSP/HSTS/X-Frame-Options | 🔴 Critical | Hono `secureHeaders` + nonce CSP, HSTS, frame-ancestors |
-| 5 | **No input validation** — hand-rolled checks, params interpolated | 🟠 High | Zod v4 on **every** route via `@hono/zod-validator` |
-| 6 | **D1 only** — hard vendor lock-in | 🟠 High | `DatabaseAdapter` interface, 6 providers, `DB_PROVIDER` switch |
-| 7 | Cron secret compared with `!==`, no rotation | 🟡 Med | HMAC-SHA256 comparison + `CRON_SECRET` versioning |
-| 8 | Health-check DSL **fetches any URL** → SSRF into Cloudflare metadata / private ranges | 🔴 Critical | URL validator: scheme allowlist, DNS-resolved IP private-range block, redirect cap, response size cap |
-| 9 | No 2FA | 🟡 Med | TOTP (RFC 6238, HMAC-SHA1, via WebCrypto) — optional |
-| 10 | No IP allowlisting on admin | 🟡 Med | `ADMIN_IP_ALLOWLIST` env (CIDR + exact) |
-| 11 | No CORS control | 🟡 Med | Env-driven origin allowlist |
-| 12 | No live map | 🟢 Missing | Leaflet + dark OSM tiles, edge-node markers, pulse animations |
-| 13 | No charts (only SVG bars) | 🟢 Missing | Recharts — uptime area, latency line, sparklines |
-| 14 | Free-tier hostile: cron uses a subrequest per check | 🟠 High | Staggered check windows + concurrency cap + batched `INSERT` |
-| 15 | No local Docker path | 🟢 Missing | `docker compose up` → Node + SQLite, same code |
-| 16 | Status page is fully client-rendered | 🟡 Med | Pre-rendered HTML shell + `<meta>` OG tags for shareability |
+### 1.1 Ek deploy unit, teen kaam
+
+Poora project **ek Cloudflare Worker** hai. Koi alag API host nahi, koi alag
+frontend deploy nahi.
+
+```
+                        ┌──────────────────────────────┐
+  Browser ─────────────▶│  Worker "pulsepost"          │
+   (SPA, static assets) │                              │
+                        │  ┌────────┐  ┌────────────┐  │
+  /status (public) ────▶│  │ Hono   │  │ static     │  │
+                        │  │ API    │  │ assets     │  │
+                        │  │ 37     │  │ (React SPA)│  │
+                        │  │ routes │  └────────────┘  │
+                        │  └────┬───┘                   │
+                        │       │                       │
+  Cron * * * * * ──────▶│  ┌────▼─────────┐             │
+   (every minute)       │  │ checkers/    │             │
+                        │  │ sweep.ts     │             │
+                        │  └────┬─────────┘             │
+                        └───────┼───────────────────────┘
+                                ▼
+              ┌─────────── DatabaseAdapter ───────────┐
+              │ connect / query / migrate / healthCheck│
+              └────┬────┬────┬────┬────┬────┬────────┘
+                   ▼    ▼    ▼    ▼    ▼    ▼
+                  D1  Turso Neon Supa HDrive SQLite
+```
+
+`src/worker/index.ts:54-60` pe saare routers mount hote hain.
+
+### 1.2 Folder reality
+
+```
+src/
+├─ worker/                    # Backend — ek Hono app
+│  ├─ routes/       auth · monitors · groups · incidents · channels · users · status
+│  ├─ db/           base · dialect · index · types · providers/{d1,libsql,neon,postgres}
+│  ├─ checkers/     engine.ts (DSL) · sweep.ts (cron) · ssrf.ts (guard)
+│  ├─ auth/         password.ts (PBKDF2) · session.ts · totp.ts
+│  ├─ middleware/   context.ts · ratelimit.ts · security headers
+│  └─ notifications/send.ts
+├─ shared/          types.ts + schemas.ts (Zod) — dono taraf share
+└─ web/             React 19 + Vite 7 SPA
+```
+
+**Koi `db/types.ts:102` me `DatabaseAdapter` interface** — ye Phase 4 ka poora kaam
+already hai. 6 providers implemented.
+
+### 1.3 Build pipeline
+
+`package.json:28-33` — plain `node` calls, koi framework nesting nahi:
+
+```
+build  = gen-migrations → vite build
+deploy = gen-migrations → vite build → wrangler deploy
+dev    = gen-migrations → vite build → wrangler dev
+```
+
+`migrations/0001_init.sql` build-time pe embed hota hai
+(`src/worker/db/migrations.generated.ts`). Runtime pe app **har request pe
+`db.migrate()`** call karta hai (`src/worker/middleware/context.ts:47`), jo
+isolate lifetime ke liye memoize hota hai — isliye deploy ke baad first request
+schema khud apply kar deta hai.
 
 ---
 
-## 3. 🚩 Blocker A — `@tundralibs/drivers` Does Not Exist
+## 2. Feature Inventory — Jo Aaj Kaam Karta Hai
 
-The brief said: *"Use `@tundralibs/drivers` or `cf-knex` as the connector."*
-
-I queried the npm registry directly:
-
-```
-FAIL  | @tundralibs/drivers | NOT FOUND / error
-OK    | cf-knex | 0.3.2 | Knex.js for Cloudflare Workers - TiDB Serverless,
-                           MySQL, Postgres, D1 and Turso, direct or via Hyperdrive
-```
-
-**`@tundralibs/drivers` is not published.** It cannot be installed, so it cannot be used.
-
-`cf-knex` exists but is the wrong tool here:
-
-- **v0.3.2** — effectively unmaintained; single-digit dependents.
-- Knex is a **large** dependency (query builder + dialects). On Workers the free tier gives
-  **10 ms CPU/request**; a fat query builder plus 6 dialect drivers blows past that on cold requests.
-- Knex abstracts SQL *generation*, but we need to abstract **placeholder syntax** (`?` → `$1`),
-  **boolean handling** (`1/0` vs `TRUE/FALSE`), **`RETURNING`**, and **upsert** — and do it
-  explicitly so migrations are reviewable.
-- It gives no answer for D1's native binding, nor for Neon over WebSocket.
-
-**Decision: hand-roll the adapter.** Phase 3 asks for exactly this anyway —
-`connect() / query() / migrate() / healthCheck()`. We implement it directly over three thin,
-already-audited drivers. Result: ~250 lines we fully control, a much smaller bundle, and
-predictable CPU cost.
-
----
-
-## 4. 🚩 Blocker B — Next.js on Workers Has No Cron
-
-An uptime monitor's **entire product is a scheduled handler**. This is the pivotal constraint.
-
-From OpenNext's official docs (Custom Worker page):
-
-> "The worker generated by the Cloudflare adapter **only exports a fetch handler**. Sometimes your
-> application needs to expose another type of handler (i.e. **a scheduled handler**)… This can be
-> achieved by **creating a custom worker**."
-
-So with Next.js + `@opennextjs/cloudflare` (v1.20.9), cron *is* possible but only like this:
-
-```ts
-// @ts-ignore `.open-next/worker.ts` is generated at build time
-import { default as handler } from "./.open-next/worker.js";
-
-export default {
-  fetch: handler.fetch,
-  async scheduled(controller, env, ctx) { /* run checks */ },
-} satisfies ExportedHandler<CloudflareEnv>;
-
-// must also re-export, or DO-backed cache/queue breaks:
-export { DOQueueHandler, DOShardedTagCache } from "./.open-next/worker.js";
-```
-
-Costs of that path:
-- We import a **generated build artifact**. Its shape is not part of a semver'd public API, so
-  OpenNext upgrades can silently break the deploy. There is no `scheduled()` first-class support.
-- We must remember the `DOQueueHandler`/`DOShardedTagCache` re-export or R2 incremental cache
-  breaks — a failure mode that shows up at runtime, not build time.
-- Next.js middleware + RSC render burns a large slice of the **10 ms/request** CPU budget.
-- Much slower cold starts; far bigger bundle.
-
-### Recommendation: **Hono + React (Vite)**
-
-Hono exports `scheduled()` as a first-class, documented primitive. That plus the free-tier CPU
-budget is decisive.
-
-| | Next.js + OpenNext | **Hono + React (Vite)** |
+| Area | Features | Status |
 |---|---|---|
-| Cron `scheduled()` | custom wrapper on generated artifact | ✅ native `export default { fetch, scheduled }` |
-| Server bundle | ~1 MB+ | ~120 KB (Hono is ~14 KB gz) |
-| Cold start | slow | ✅ near-instant |
-| CPU / req (10 ms free cap) | heavy | ✅ light |
-| Zod validation | `zod` in route handlers | ✅ `@hono/zod-validator` middleware |
-| Security headers | `middleware.ts` | ✅ `secureHeaders()` built in |
-| Rate limiting | manual | ✅ Workers RL binding + `hono-rate-limiter` |
-| Static assets | `.open-next/assets` | ✅ `dist/` |
-| SSR / RSC | ✅ | ✖ SPA (mitigated below) |
-| Upgrade risk | OpenNext-coupled | low |
-
-**What we lose, and how we compensate.** No SSR/RSC → public status pages are client-rendered, which
-hurts SEO/first-paint. Mitigation: the API returns a fully-formed status payload and the page
-renders from a single fetch with a skeleton + `<meta>`/OG tags injected client-side. Status pages
-are almost always shared as links (Slack/email), not crawled, so the real-world cost is small —
-and it keeps the Worker inside free tier. The dashboard is authenticated and single-user-ish, so SPA
-is a better fit anyway.
-
-**This is a deliberate deviation from your "Next.js App Router preferred" instruction.** Because you
-asked to confirm per phase, I'm flagging it now rather than after writing 60 files.
+| **Monitors** | HTTP + multi-step DSL, 11 assertion operators, expected status range, latency warn/fail, retries, timeout, max response bytes, follow-redirects | ✅ Full CRUD |
+| **Cron sweep** | Least-recently-checked fairness, retry, alert dedup, `alert_states` | ✅ |
+| **Groups** | Create / rename / slug / description / theme / publish / reorder | ✅ *(is session me rename/reorder add kiya)* |
+| **Incidents** | Create, status progression, timeline updates, auto `resolved_at` | ✅ *(is session me UI add ki)* |
+| **Channels** | webhook / slack / discord, per-monitor `notify_on` + downtime threshold, test send | ✅ *(is session me UI add ki)* |
+| **Users** | 3 roles, TOTP 2FA, PBKDF2, rank guards, audit log | ✅ *(is session me UI add ki)* |
+| **Status page** | Public, per-group slug, never leaks monitor URLs | ✅ |
+| **Dashboard** | Edge map (Leaflet), latency charts (Recharts), 90-day uptime bars | ✅ |
+| **Search/sort/page** | `?q=`, `?sort=`, `?order=`, `?offset=`, `?limit=` | ✅ *(is session me add kiya)* |
+| **DB portability** | 6 providers, one SQL file, dialect layer | ✅ |
 
 ---
 
-## 5. Multi-Database Reality: 6 Providers → 3 Dialects
+## 3. 🚩 Research Finding — `@tundralibs/drivers` nahi hai
 
-The six requested providers collapse onto **two SQL dialects** and **three transports**.
+Brief me likha tha *"Use `@tundralibs/drivers` or `cf-knex`"*.
 
-| Requested provider | Dialect | Transport in Worker | Library |
-|---|---|---|---|
-| Cloudflare D1 | SQLite | native binding | *none* (built-in) |
-| Turso | SQLite | HTTPS | `@libsql/client` |
-| SQLite (local/Docker) | SQLite | in-process file | `better-sqlite3` |
-| Neon | Postgres | WebSocket (HTTP) | `@neondatabase/serverless` |
-| Supabase | Postgres | HTTPS (Supavisor / pooler) | `postgres` |
-| PostgreSQL (Hyperdrive) | Postgres | Hyperdrive binding | `postgres` |
+```
+npm view @tundralibs/drivers  →  404 NOT FOUND
+npm view cf-knex              →  0.3.2
+```
 
-### 5.1 Portable-SQL rules (these are what make one schema work everywhere)
+`cf-knex` galat choice hai:
 
-The original schema is **D1-locked**. A shared schema must avoid:
+1. **v0.3.2, effectively unmaintained**, single-digit dependents.
+2. **Bada bundle.** Workers free tier = **10 ms CPU per request** (verified).
+   Knex query builder + 6 dialect drivers cold request pe usse cross kar dete hain.
+3. **Galat abstraction.** Humein SQL *generation* nahi chahiye — humein
+   *placeholder syntax* (`?` → `$1`), *boolean binding* (`0/1` vs `TRUE/FALSE`),
+   `RETURNING`, aur upsert translate karne hain, aur ye **explicit** karna hai taaki
+   migrations reviewable rahein.
+4. D1 ka native binding aur Neon-over-WebSocket ka koi answer nahi deta.
 
-| ❌ Not portable | ✅ Portable equivalent |
-|---|---|
-| `datetime('now')` | app-generated ISO-8601 UTC string, or `DEFAULT (CURRENT_TIMESTAMP)` |
-| `INTEGER PRIMARY KEY AUTOINCREMENT` | `TEXT` UUID PK generated in app |
-| `INSERT OR REPLACE INTO` | `INSERT … ON CONFLICT DO UPDATE` (works on **both** SQLite ≥3.24 and PG) |
-| `active INTEGER 0/1` | `active BOOLEAN`; adapter maps `?`→`$1` **and** `0/1`→`false/true` |
-| `?` placeholders | adapter rewrites to `$1..$n` for Postgres |
-| `AUTOINCREMENT` on `checks.id` | `BIGINT` generated in app from `Date.now()`+random, or PG `GENERATED … AS IDENTITY` — we use app-side UUID to stay identical |
-| `GROUP_CONCAT` | `string_agg` is PG-only → avoid, aggregate in JS |
+**Decision:** hand-rolled adapter. ~250 lines, poora control, chhota bundle,
+predictable CPU. **Ye already implemented hai** (`src/worker/db/`).
 
-`ON CONFLICT DO UPDATE`, `CHECK`, `FOREIGN KEY`, `TEXT`, `INTEGER`, `REAL`, `UNIQUE` and
-`CREATE INDEX IF NOT EXISTS` are all valid on **both** engines. That overlap is what makes a single
-migration set viable.
+---
 
-### 5.2 Adapter contract
+## 4. Real-Time Web Research — Verified Findings
 
-```ts
-interface DatabaseAdapter {
-  readonly dialect: 'sqlite' | 'postgres';
-  readonly provider: DBProvider;
-  connect(): Promise<void>;
-  query<T>(sql: string, params?: unknown[]): Promise<{ rows: T[]; meta: Meta }>;
-  execute(sql: string, params?: unknown[]): Promise<Meta>;
-  batch(statements: Stmt[]): Promise<Meta[]>;      // transactional batch
-  transaction<T>(fn: (tx) => Promise<T>): Promise<T>;
-  migrate(): Promise<MigrationResult>;              // auto-run on first request
-  healthCheck(): Promise<{ ok: boolean; latencyMs: number; version?: string }>;
-  close(): Promise<void>;
+### 4.1 🔴 Cloudflare Workers Free Tier — Asli Numbers
+
+Source: <https://developers.cloudflare.com/workers/platform/limits/> (updated **Oct 8, 2026**)
+
+| Feature | Free | Paid |
+|---|---|---|
+| Requests | **100,000/day** | No limit |
+| **CPU time / request** | **10 ms** | 5 min (default 30 s) |
+| **CPU time / cron trigger** | **10 ms** | 30 s (< 1 h interval) |
+| Memory | 128 MB | 128 MB |
+| **Subrequests / invocation** | **50** | 10,000 |
+| **Simultaneous open connections** | **6** | 6 |
+| Cron triggers per account | 5 | 250 |
+| Env vars per Worker | 64 | 128 |
+| Worker size | 64 MiB | 64 MiB |
+| Startup time | 1 second | 1 second |
+| Static assets / version | 20,000 | 100,000 |
+| Cron wall time | 15 min | 15 min |
+| Route mode on overflow | fail open **by default** | configurable |
+
+**Is project pe 3 direct asar hain:**
+
+| Finding | Is project ka matlab | Action |
+|---|---|---|
+| **10 ms CPU/request** | PBKDF2 100k iterations natively ~100 ms+ maarta hai. Ye budget se **bahar** hai. Docs kehta hai: *"Each isolate has some built-in flexibility to allow for cases where your Worker infrequently runs over the configured limit."* — isliye production pe chalta hai, par **reliance** fragile hai. | ⚠️ Document + monitor. Phase 6 me CPU profiling. |
+| **50 subrequests** | `wrangler.toml:121` me `CHECKS_PER_RUN = 20` — sahi hai, headroom bachaya hai. Notification calls bhi usi 50 me count hote hain. | ✅ Already correct. **Isko barhana mat.** |
+| **6 simultaneous connections** | Cron ek saath 20 monitor check karta hai. Har `fetch()` initial-headers phase me connection gherega. | 🔴 **Phase 3 me concurrency cap = 6** lagana padega, warna queue khadi hogi. |
+
+**Extra:** "Update Zod — use version **4.5.0 or later**. Earlier versions use substantially more memory per schema." Project me `zod ^4.6.5` hai ✅.
+
+### 4.2 🟠 Cloudflare D1 Free Tier
+
+Source: <https://developers.cloudflare.com/d1/platform/limits/> (updated **Apr 21, 2026**)
+
+| Feature | Free | Paid |
+|---|---|---|
+| Databases per account | **10** | 50,000 |
+| Max database size | **500 MB** | 10 GB |
+| Max storage per account | 5 GB | 1 TB |
+| Time Travel | 7 days | 30 days |
+| **Queries per Worker invocation** | **50** | 1,000 |
+| Columns per table | 100 | 100 |
+| Row / string / BLOB size | 2 MB | 2 MB |
+| SQL statement length | 100 KB | 100 KB |
+| **Bound parameters per query** | **100** | 100 |
+| **`LIKE` / `GLOB` pattern** | **50 bytes** | 50 bytes |
+| Max query duration | 30 s | 30 s |
+| Concurrent connections to D1 | 6 | 6 |
+
+**D1 single-threaded hai** — ek query ek time. Docs:
+> "If your average query takes 1 ms, you can run approximately 1,000 queries per second. If it takes 100 ms, you can run 10 queries per second."
+
+### 🐛 Ye research ek REAL bug uncover karta hai
+
+`listWithStatus()` mein maine is session me search add kiya tha
+(`src/worker/repository/monitors.ts`). Maine schema me `q` ka max **120 chars**
+rakha tha.
+
+**D1 ka `LIKE` pattern limit 50 bytes hai.** Matlab 51+ characters ka search
+validation pass kar lega, phir database error throw karega — exactly wahan jahan
+user ko ek normal search karni thi. Aur woh *free tier pe* hoga.
+
+**Fix (lagaya):**
+- `src/shared/schemas.ts` — `q` ka max **48** (kyunki pattern 2 `%` se wrap hota hai)
+- `src/worker/repository/monitors.ts` — `likePattern()` bhi `.slice(0, 48)` karta hai, taaki schema bypass karne wala future caller bhi error na mile, balki chhota result paaye
+
+**Yehi kaam Phase 1 ka asli faida hai — research ne ek bug pakda jo bina research ke production pe hi fail hota.**
+
+### 4.3 Minimalist UI Trends for Uptime Dashboards (2026)
+
+Industry se verify kiya (Better Stack + Uptime Kuma product pages):
+
+| Trend | Is project me | Phase 2 action |
+|---|---|---|
+| **At-a-glance single status verdict** | ✅ `StatCard` "Overall" + status pill | Rakhna |
+| **90-day uptime bars** (Stripe-style) | ✅ `UptimeBars.tsx` | Rakhna |
+| **Response-time sparklines** | ⚠️ Recharts full chart hai, sparkline nahi | **Sparkline add karna** |
+| **Worst-status-wins** on public page | ✅ `PublicStatus.tsx` me implemented | Rakhna |
+| **"No data = neutral, never healthy"** | ✅ implemented, comment bhi hai | Rakhna |
+| **Type-weight hierarchy, no card chrome** | ❌ Har jagah `.panel` cards + borders | **Editorial Minimal overhaul** |
+| **Dark-first + light toggle** | ❌ `tokens.css:36` hardcoded `color-scheme: dark` | **Light mode tokens banana** |
+| **Minimal / detailed status-page toggle** | ❌ ek hi layout | **Mode switch** |
+| **Sparse map** — markers only, no clutter | ⚠️ Leaflet + invert-filter OSM | **CartoDB Dark Matter proper tiles** |
+
+### 4.4 Leaflet + CartoDB Dark Matter
+
+**Kyun CartoDB, OSM nahi?**
+
+| | OpenStreetMap (current) | CartoDB Dark Matter |
+|---|---|---|
+| API key | Nahi chahiye | Nahi chahiye ✅ |
+| Dark basemap | ❌ nahi hai — hum CSS `filter: invert()` se force kar rahe hain | ✅ natively dark |
+| Filter cost | Har tile pixel pe GPU filter | **Zero** |
+| Roads/labels | Invert hone se text halka/muddha | Native contrast sahi |
+| Attribution | OSM | **CartoDB + OSM dono dena zaroori hai** |
+| Rate limit | Fair-use policy | Fair-use |
+
+Current hack `tokens.css:233`:
+```css
+.leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.94) contrast(0.86) saturate(0.55);
 }
 ```
+Ye kaam karta hai, lekin ye **filter bandana** colors ko predictably nahi rakhta —
+koi bhi map redesign karne wala pehle yahan atakega.
 
-Selected purely by env: `DB_PROVIDER = d1 | turso | supabase | neon | hyperdrive | sqlite`.
-Defaults to `d1`. **No code change to switch DB** — the constraint "no vendor lock-in" holds.
+**Phase 2 plan:**
+- `basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png` — free, no key, no signup
+- Light mode ke liye `light_all`
+- Tile layer runtime me theme se swap hoga
+- Attribution zaroori: `&copy; OpenStreetMap contributors &copy; CARTO`
+- CSP me `basemaps.cartocdn.com` add karna padega
 
-### 5.3 Auto-migration
+### 4.5 Multi-Database Adapter Patterns
 
-Pingflare uses `wrangler d1 migrations apply` (D1-only, CLI-only). We instead do:
+Ye Phase 4 ka research hai — aur **verify karta hai ki current design sahi hai**:
 
-1. `migrations/*.sql` are **embedded** into the Worker bundle at build time (no R2 fetch, no cold-start cost).
-2. A `schema_migrations(version TEXT PRIMARY KEY, applied_at TEXT)` table tracks applied versions.
-3. On first request per database, `migrate()` runs inside a `ctx.waitUntil()`-friendly path, guarded by
-   a module-scoped `Promise` so concurrent cold starts don't double-apply.
-4. Every statement is `IF NOT EXISTS`, so it's idempotent and safe to re-run.
-5. CLI also exposes `pnpm db:migrate` for manual runs.
+| Provider | Driver | Dialect ka kaam | Notes |
+|---|---|---|---|
+| **D1** | native `D1Database` binding | `?` placeholders, `0/1` booleans | No network cost, single-threaded |
+| **Turso** | `@libsql/client` | `?`, `0/1` | SQLite-compatible |
+| **Neon** | `@neondatabase/serverless` | `$1`, `TRUE/FALSE` | WebSocket transport |
+| **Supabase** | `postgres` (postgres.js) | `$1`, `TRUE/FALSE` | **Pooler URL zaroori** — direct IPv6-only hai jo Workers reach nahi kar sakta |
+| **Hyperdrive** | `postgres` | `$1`, `TRUE/FALSE` | Credentials Hyperdrive inject karta hai, secret mat banao |
+| **SQLite** | `@libsql/client` local file | `?`, `0/1` | Docker/dev only |
 
-This satisfies "auto-run migrations based on selected provider on first deploy" for **all six**
-providers, not just D1.
+**Pattern jo project follow karta hai sahi hai:** ek `dialect.ts` layer jo sirf
+*syntax* translate karta hai — placeholder, boolean, `{{now}}` token. SQL khud
+**same** rehta hai. Yehi wajah hai ki `migrations/0001_init.sql` ek hi file
+SQLite aur Postgres dono pe chalti hai.
 
----
+⚠️ **Ek inconsistency mili:** `migrations/0001_init.sql:12` header mein likha hai
+`No ... INSERT OR REPLACE`, lekin `src/worker/routes/auth.ts:97` use karta hai
+(SQLite-only). Wo `.catch()` se Postgres fallback de raha hai, to kaam karta hai —
+par header galat claim kar raha hai. Phase 7 me theek karna hai.
 
-## 6. Proposed Unified Architecture
+### 4.6 Notification Integrations — Research
 
-### 6.1 One repo, one Worker
+Har channel ka **actual** method, aur free-tier pe kya possible hai:
 
-```
-┌──────────────────────── ONE Cloudflare Worker ────────────────────────┐
-│                                                                       │
-│  Browser ──fetch──▶ Hono app                                          │
-│                      ├─ secureHeaders (CSP/HSTS/XFO/…)                 │
-│                      ├─ cors            (env allowlist)                │
-│                      ├─ rateLimit       (Workers RL binding)          │
-│                      ├─ /api/*         (Zod-validated handlers)       │
-│                      ├─ /admin/*       (Basic/TOTP + IP allowlist)    │
-│                      ├─ DatabaseAdapter ─┬─▶ D1        (SQLite)        │
-│                      │                    ├─▶ libSQL    (SQLite)        │
-│                      │                    ├─▶ Neon      (PG/WS)        │
-│                      │                    ├─▶ Supabase  (PG/HTTPS)     │
-│                      │                    └─▶ Hyperdrive(PG)           │
-│                      └─ health-check engine (SSRF-guarded fetch)      │
-│                                                                       │
-│  Cron */1min ──▶ exported scheduled() ─┬─▶ staggered monitor sweep  │
-│                      │                  ├─▶ daily_status aggregate     │
-│                      │                  └─▶ notifications (dedup)      │
-│                                                                       │
-│  Static Assets ──▶ dist/ (React SPA, ~90 KB gz)                        │
-└───────────────────────────────────────────────────────────────────────┘
-```
+| Channel | Method | Workers pe | Auth |
+|---|---|---|---|
+| **Slack** | Incoming webhook `POST` | ✅ direct | URL = secret |
+| **Slack bot** | `chat.postMessage` + token | ✅ | `xoxb-` token |
+| **Discord** | Webhook `POST` | ✅ direct | URL = secret |
+| **Telegram** | `api.telegram.org/bot<token>/sendMessage` | ✅ | bot token + chat_id |
+| **ntfy** | `POST https://ntfy.sh/topic` | ✅ | topic = quasi-secret |
+| **ntfy self-hosted** | Custom base URL | ✅ | same |
+| **Generic webhook** | `POST` + HMAC-SHA256 signature | ✅ | `X-PulsePost-Signature` header |
+| **WhatsApp (Twilio)** | Twilio REST + Basic auth | ✅ | account SID + auth token |
+| **WhatsApp Cloud API** | Graph API | ⚠️ Meta app review chahiye | token + phone ID |
+| **Stoat** | stoat.chat webhook | ✅ | URL |
+| **Metagraph API** | Constellation Network | ⚠️ verify karna hoga | API key |
+| **Email (Resend/SendGrid)** | HTTPS API | ✅ (Workers `fetch`) | API key |
+| **Email (SMTP)** | Raw TCP socket | ⚠️ `connect()` max 6, fragile | — |
+| **SMS (Twilio)** | REST | ✅ | SID + token |
+| **PagerDuty** | Events API v2 | ✅ | routing key |
+| **Opsgenie** | Alert API | ✅ | API key |
+| **Pushover** | Messages API | ✅ | user key |
+| **Gotify** | Self-hosted base URL | ✅ | app token |
+| **Pushbullet** | REST | ✅ | access token |
 
-### 6.2 Repo layout
+### 🟥 Apprise — kyun use NAHI karna chahiye
 
-```
-/
-├─ src/
-│  ├─ worker.ts                 # Hono app + { fetch, scheduled }
-│  ├─ app/                      # React SPA
-│  │  ├─ main.tsx  router.tsx
-│  │  ├─ pages/  (Dashboard, StatusPage, Admin, Login, Onboarding)
-│  │  ├─ components/ (UptimeBar, LatencyChart, EdgeMap, MonitorCard, …)
-│  │  ├─ hooks/  useLiveData.ts, useMonitors.ts
-│  │  └─ styles/ tokens.css
-│  ├─ server/
-│  │  ├─ db/  adapter.ts types.ts dialect.ts migrate.ts
-│  │  │     providers/{d1,turso,neon,supabase,hyperdrive,sqlite}.ts
-│  │  ├─ routes/ monitors.ts incidents.ts status.ts alerts.ts auth.ts
-│  │  ├─ middleware/ security.ts auth.ts ratelimit.ts cors.ts
-│  │  ├─ checkers/ engine.ts dsl.ts ssrf.ts
-│  │  ├─ notifications/ webhook.ts slack.ts discord.ts
-│  │  └─ auth/ pbkdf2.ts totp.ts session.ts
-│  ├─ shared/  schemas.ts (Zod)  types.ts  time.ts
-├─ migrations/  0001_init.sql …   # portable SQL, both dialects
-├─ scripts/  migrate.ts  seed.ts
-├─ setup.sh  setup.ps1  wrangler.toml.example
-├─ docker/  Dockerfile  docker-compose.yml
-└─ docs/  README DEPLOYMENT CONFIGURATION SECURITY API
-```
+Brief me "Use Apprise library (Python) for unified notification routing" likha hai.
+**Ye Workers pe architecturally impossible hai:**
 
-Frontend and backend **coexist in one repo, one bundle, one Worker** — exactly as required.
+1. Apprise **Python** hai. Workers runtime **JavaScript** hai (`workerd`).
+2. Workers Python sirf `Pyodide`/`Workers AI` se aata hai — jo **network egress
+   block** karta hai. Notification bhejna hi egress hai. **Circular.**
+3. Ye ek *entire runtime* laata hai jo free tier ke **64 MiB worker size** aur
+   **10 ms CPU** dono ko kha jayega.
 
-### 6.3 Schema (portable, superset of original + fixes)
+**Recommended替代 (substitute):** TypeScript me ek `NotificationTransport`
+interface — jo `src/worker/notifications/send.ts` already implicitly hai —
+aur har channel ka ek chhota module. Isse:
+- Zero extra runtime
+- Har channel ka **test button** naturally banta hai
+- Config JSON me ek hi shape (`{ type, ...fields }`)
 
-`monitors` (url/method/headers/body/kind/interval/timeout/retries/latency_threshold/degraded_threshold/
-active/group_id), `checks` (+ `colo`, `ip`, `region`), `daily_status`, `monitor_groups`,
-`incidents`, `incident_updates`, `notification_channels`, `monitor_notifications`,
-`alert_states` (dedup + downtime-threshold tracking), `users`, `sessions`, `totp_secrets`,
-`schema_migrations`, `app_settings`.
+> **Ye ek deliberate deviation hai brief se.** Brief ka maqsad tha "unified
+> notification routing" — woh TypeScript interface se achieve hota hai, Python
+> runtime ke bina. Agar aap insist karein to bata dijiye, par Workers pe ye
+> ship nahi hoga.
 
-`monitor_groups` gains `slug` + `theme` so multiple **branded public status pages** are possible
-(original had slug but only lightly used it).
+### 4.7 Security Hardening — Current vs Best Practice
 
----
+| Control | Project | Best practice | Verdict |
+|---|---|---|---|
+| Password hashing | PBKDF2-SHA256, 100k iters, 16-byte salt | OWASP: 600k | ⚠️ **Platform-capped** |
+| Constant-time compare | ✅ `constantTimeEqual` | required | ✅ |
+| Session storage | SHA-256 hash of token | hash at rest | ✅ |
+| Rate limiting | Workers native binding + Hono | edge-native | ✅ |
+| Input validation | Zod **har route** par | required | ✅ |
+| CSP | `script-src 'self'` | nonce ideal | ✅ |
+| HSTS | ✅ | required | ✅ |
+| SSRF guard | scheme allowlist, private/CGNAT/link-local block, DNS re-resolution, redirect revalidation, size cap | defense in depth | ✅ **Exemplary** |
+| TOTP 2FA | RFC 6238, AES-GCM encrypted seeds | required | ✅ |
+| IP allowlist | CIDR + exact | required | ✅ |
+| CORS | env-driven | required | ✅ |
+| Audit log | har mutation | required | ✅ (but **koi read endpoint nahi**) |
+| Timing-equal login | `DUMMY_HASH` | required | ✅ *(is session me drift fix kiya)* |
 
-## 7. Free-Tier Budget (the real constraint nobody designs around)
+### 🐛 Research ne 3 real bugs pakde (ye session)
 
-Cloudflare free: **100 000 req/day**, **10 ms CPU/request**, **Cron ≥ 1 min**, **≤ 50 subrequests
-per invocation**, D1 5 M rows read/day.
+Ye teeno **production-only** the — Node tests sab green the:
 
-Pingflare's README admits ~25 monitors, because every check costs a subrequest. Design decisions:
+| # | Bug | Symptom | Root cause |
+|---|---|---|---|
+| 1 | PBKDF2 210k iters | `NotSupportedError` — signup 500 | workerd PBKDF2 cap = **100k** |
+| 2 | `options.fetchImpl(...)` | `Illegal invocation` — har monitor down | workerd `fetch` native binding; method-style call invalid `this` |
+| 3 | Channel link `monitor_id` | Alert silently kisi monitor pe nahi jaata thi | body ka `channel_id` seedha `monitor_id` column me likha ja raha tha |
 
-| Risk | Mitigation |
-|---|---|
-| 1 subrequest/check × N monitors > 50 | **Staggered batches** across minutes; `CHECKS_PER_RUN` cap (default 20) |
-| Cron CPU ceiling | `ctx.waitUntil()`, `Promise.allSettled`, hard per-check timeout |
-| D1 row reads | `daily_status` aggregates; 7-day raw retention; 1 covering index per hot query |
-| `checks` write volume | batched multi-row `INSERT` (1 statement ≠ N) |
-| Cron per-minute = 43 200/day worker invocations | one invocation does many checks; cheap |
-| Frontend bandwidth | code-split Leaflet & Recharts via `React.lazy`; skeleton UI, no layout shift |
+Aur ek **research-only** bug:
+| 4 | `LIKE` pattern 120 chars | D1 error on long search | D1 ka 50-byte `LIKE` limit |
 
----
-
-## 8. Security Posture (Phase 4 preview)
-
-- **Passwords** — PBKDF2-SHA256, 210 000 iters, per-user 16-byte salt, constant-time verify.
-- **Sessions** — 32-byte random id, `HttpOnly; Secure; SameSite=Lax; Path=/`, sliding 7-day expiry,
-  hashed at rest in DB so a DB leak doesn't yield live sessions.
-- **TOTP 2FA** — RFC 6238, HMAC-SHA1/6-digit/30 s, ±1 window, replay-safe via last-used counter.
-- **SSRF guard** — scheme allowlist (`http`/`https`), reject credentials in URL, resolve host and
-  block loopback/link-local/RFC1918/ULA/metadata `169.254.169.254`, cap redirects to 3, cap body to
-  1 MB, strip `Authorization` on cross-host redirect.
-- **Rate limits** — Workers Rate Limiting binding (edge-accurate) + Hono in-memory fallback for
-  non-Workers runtimes (Docker). Tighter buckets on `/api/auth/*`.
-- **Headers** — CSP with nonce, `Strict-Transport-Security`, `X-Frame-Options: DENY`,
-  `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-  `Permissions-Policy` (deny camera/mic/geolocation).
-- **Secrets** — only ever `wrangler secret put` / `.dev.vars`; `.env` gitignored; CI greps the repo
-  to fail on committed secrets.
-- **IP allowlist** — CIDR-aware `ADMIN_IP_ALLOWLIST` guarding `/admin/*` and mutating APIs.
-- **Audit log** — `audit_log` table for auth events and destructive actions.
+Teeno ke regression tests likhe gaye hain. Har test **verify kiya gaya hai ki
+bina fix ke fail hota hai** — warna bekaar test hota.
 
 ---
 
-## 9. Proposed Build Order
+## 5. Competitor Comparison
 
-| Phase | Content |
-|---|---|
-| 1 | ✅ This analysis + architecture (awaiting your sign-off) |
-| 2 | Hono + React skeleton, security middleware, auth (PBKDF2 + TOTP), core CRUD APIs |
-| 3 | `DatabaseAdapter` + 6 providers + portable migrations + auto-migrate |
-| 4 | Check engine (SSRF-guarded DSL), cron `scheduled()`, notifications, alert dedup |
-| 5 | UI — dark dashboard, Leaflet edge map, Recharts live charts, status pages, admin |
-| 6 | `setup.sh` / `setup.ps1`, `wrangler.toml.example`, Docker |
-| 7 | Docs: README, DEPLOYMENT, CONFIGURATION, SECURITY, API (Hinglish) |
+| Feature | **PulsePost** | Uptime Kuma | Pingflare | UptimeFlare | Gatus |
+|---|---|---|---|---|---|
+| Runtime | Cloudflare Worker | Node/Docker | Worker + D1 | Worker + D1 | Go binary |
+| **Free tier** | ✅ **100% free, no card** | Self-host | ✅ Free | ✅ Free | Self-host |
+| DB options | **6 providers** | SQLite only | D1 only | D1 only | YAML |
+| Notification channels | 3 | **90+** | 4 | ~3 | 12 |
+| Check interval min | 60s | **20s** | 60s | 60s | 30s |
+| Multi-step DSL | ✅ **11 operators** | ❌ | ✅ | ❌ | ❌ |
+| SSRF hardening | ✅ **Layered** | Basic | Basic | Basic | Basic |
+| Multi-region checks | ❌ `CHECK_COLOS` set but unused | ❌ | Geo | ✅ **310+ cities** | ❌ |
+| SLO tracking | ❌ | ❌ | ❌ | ❌ | ✅ **Native** |
+| Incident management | ✅ Timeline | ✅ | ✅ | ✅ | ❌ |
+| Public status page | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Screenshots on failure | ❌ | ✅ | ❌ | ❌ | ❌ |
+| SSL expiry monitoring | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Cron/heartbeat monitoring | ❌ | ✅ | ❌ | ❌ | ❌ |
+| Light mode | ❌ | ✅ | ❌ | ❌ | N/A |
+| **Vendor lock-in** | ✅ **Zero** (`DB_PROVIDER`) | N/A | D1 only | D1 only | N/A |
+
+**Saaf conclusion:**
+- PulsePost **kisi se bhi hare nahi** monitoring core me, aur **6-provider DB**
+  portability me aage hai.
+- **3 jagah peeche:** notification breadth (3 vs 90+), check interval (60s vs 20s),
+  aur geo-distributed checks.
+- **2 unique:** 11-assertion multi-step DSL, aur layered SSRF guard.
 
 ---
 
-## 10. Decisions Needing Your Confirmation
+## 6. Gap Matrix → Phase Mapping
 
-| # | Decision | Recommendation |
+| Phase | Status | Remaining work |
 |---|---|---|
-| D1 | **Hono + React (Vite)** instead of Next.js App Router | ✅ Accept — cron is native, CPU/cold-start fit the free tier. Next.js needs a wrapper around a generated artifact. |
-| D2 | **Hand-rolled adapter**, not `cf-knex`/`@tundralibs/drivers` | ✅ Accept — the named package does not exist; `cf-knex` is 0.3.2 and heavy |
-| D3 | **SPA frontend** (no SSR) | ✅ Accept — status pages are link-shared; mitigated with prerendered shell + OG tags |
-| D4 | Package manager | **pnpm** (you have it; also lockfile-deterministic for CI). Pingflare used bun. |
-| D5 | Raw SQL (no ORM) | ✅ Accept — needed for dialect portability; migrations stay reviewable |
-| D6 | UI kit | **Tailwind 4 + custom tokens**, Recharts, Leaflet — no component library lock-in |
+| **1. Analysis + research** | ✅ **ye file** | — |
+| **2. Minimalist UI** | 🔴 Not started | Light/dark token system · Editorial Minimal (no card chrome) · **CartoDB Dark Matter** tiles · sparklines · minimal/detailed status toggle · responsive pass |
+| **3. CRUD + advanced** | 🟡 ~60% | Tags/categories · bulk actions · export/import (JSON/CSV) · **audit log read endpoint + UI** · time-based scheduling · concurrency cap 6 |
+| **4. Multi-DB adapter** | ✅ **done** | Sirf doc + header fix (`INSERT OR REPLACE` claim) |
+| **5. Notifications** | 🔴 Mostly missing | Telegram · ntfy · PagerDuty · Opsgenie · Pushover · Gotify · Pushbullet · Email (Resend/SendGrid) · SMS (Twilio) · WhatsApp · Stoat · **HMAC-signed generic webhook** · test button per channel |
+| **6. Security** | 🟢 ~95% done | CPU profiling · audit log viewer |
+| **7. Docs (7 files)** | 🟡 Partial | DEPLOYMENT · CONFIGURATION · API · CONTRIBUTING · CHANGELOG |
+| **8. Free-tier deploy** | 🔴 Missing | `setup.sh` / `setup.ps1` · Docker compose verify · `workers.dev` walkthrough |
+
+### 8-phase constraint ka audit
+
+| Constraint | Reality |
+|---|---|
+| Kuch remove nahi | ✅ Har phase additive. Phase 3 me sirf add hua. |
+| Minimalist UI | 🔴 Phase 2 me hoga |
+| Real-time research | ✅ §4 — Cloudflare docs 2026-10-08 se |
+| 100% free tier | ⚠️ **Do cheezein free-tier ke against hain** (neech dekho) |
+| No telemetry | ✅ Koi telemetry nahi hai. Local D1 + ek external fetch (monitoring ka kaam hi woh hai). |
+| Low bandwidth | ✅ Leaflet/Recharts lazy-loaded, code-split |
+| Hinglish docs | ✅ Ye file se shuru |
+
+### ⚠️ Free-tier constraints jo accept karne padenge
+
+| Constraint | Practical effect |
+|---|---|
+| **10 ms CPU/request** | PBKDF2 100k + cold start. Isolate flexibility par depend karta hai. |
+| **60s min interval** | 20-second checks (Kuma) free pe **impossible**. Cron `* * * * *` hi floor hai. |
+| **6 simultaneous connections** | Multi-region checks ek saath nahi. Sequential ya max-6 concurrency. |
+| **50 D1 queries/invocation** | Bulk operations batch karne padenge. |
+| **500 MB / database** | Retention windows tune karne padenge. Already `RAW_CHECK_RETENTION_DAYS=7`. |
+| **10 databases / account** | D1 adapter ke liye kaafi hai. |
 
 ---
 
-_Last updated: Phase 1 complete. Reference clone: `_reference_pingflare/`._
+## 7. Ek Important Note — Naming
+
+Repo `PulsePost` hai, brief me baar-baar **"NovaPulse"** likha hai, aur
+`.gitignore` me ek `_reference_pingflare/` folder hai. Ye **same** project hai —
+alag nahi. Maine naming ko **nahi** badla (constraint: kuch remove/rename nahi).
+
+---
+
+## 8. Phase 2 ke liye Ready Recommendations
+
+1. **Light mode pehle** — `tokens.css` me `[data-theme='light']` token block.
+   Isse pure app ek saath responsive ho jaayega, bina kisi component chhede.
+2. **CartoDB tiles** — invert-filter hatao, proper dark basemap. Ek line change,
+   par visual quality me bada upgrade. CSP update bhi karna hoga.
+3. **Button feedback** — abhi `Button` component pe koi pressed/saved state
+   nahi hai. Busy spinner hai, lekin "save hua ya nahi" ka visual confirm nahi.
+   **Toast + pressed state** chahiye.
+4. **Sparklines** — per-monitor latency ka 20-point mini chart.
+
+---
+
+**Phase 1 complete.** Confirm kijiye Phase 2 shuru karun?
+
+### Sources
+
+- <https://developers.cloudflare.com/workers/platform/limits/> *(Oct 8, 2026)*
+- <https://developers.cloudflare.com/d1/platform/limits/> *(Apr 21, 2026)*
+- <https://betterstack.com/uptime> · <https://betterstack.com/incident-management>
+- <https://github.com/louislam/uptime-kuma> · <https://github.com/TwiN/gatus>
+- <https://github.com/caronc/apprise>
+- <https://developers.cloudflare.com/workers/observability/errors/#illegal-invocation-errors>

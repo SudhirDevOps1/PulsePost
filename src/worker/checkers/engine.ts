@@ -358,6 +358,14 @@ async function executeRequest(
   const maxRedirects = spec.followRedirects ? options.policy.maxRedirects : 0;
   const startedAt = options.clock();
 
+  // `fetch` is a native binding in workerd, not a plain function. Calling it as
+  // a method — that is, with any `this` other than the global — throws
+  // "Illegal invocation: function called with incorrect `this` reference".
+  // Node's `fetch` ignores `this`, so the tests exercise this path happily and
+  // only a deployed Worker ever sees the failure. Reading it into a local gives
+  // the call an `undefined` receiver, which workerd accepts.
+  const doFetch = options.fetchImpl;
+
   let currentUrl = spec.url;
   let currentHeaders = { ...spec.headers };
   let currentMethod = spec.method;
@@ -374,7 +382,7 @@ async function executeRequest(
 
     let response: Response;
     try {
-      response = await options.fetchImpl(target.toString(), {
+      response = await doFetch(target.toString(), {
         method: currentMethod,
         headers: currentHeaders,
         body: currentMethod === 'GET' || currentMethod === 'HEAD' ? undefined : body,

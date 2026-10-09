@@ -91,17 +91,63 @@ function mapCheck(row: Record<string, unknown>): Check {
   };
 }
 
+export type MonitorSortKey = 'name' | 'created_at' | 'updated_at';
+
+export const MONITOR_SORT_KEYS: readonly MonitorSortKey[] = ['name', 'created_at', 'updated_at'];
+
 export interface ListOptions {
   groupId?: string | undefined;
   status?: MonitorStatus | undefined;
   active?: boolean | undefined;
   limit?: number | undefined;
+  offset?: number | undefined;
+  /** Case-insensitive substring match against monitor name and URL. */
+  search?: string | undefined;
+  /** Whitelisted only — this value is interpolated into ORDER BY. */
+  sort?: MonitorSortKey | undefined;
+  order?: 'asc' | 'desc' | undefined;
   /**
    * Attach a per-monitor `daily` array for the 90-day bar.
    * Opt-in: at 200 monitors x 90 days this is ~18k numbers of JSON, and most
    * callers never look at it.
    */
   includeDaily?: boolean | undefined;
+}
+
+/**
+ * Build the LIKE pattern for a substring search.
+ *
+ * `LOWER()` on both sides is what makes this behave the same on SQLite and
+ * PostgreSQL: SQLite's LIKE is already case-insensitive for ASCII, Postgres's
+ * is case-sensitive, and without the wrapper the same query would return
+ * different rows depending on which provider is behind it.
+ *
+ * The wildcards are escaped so a literal `%` in the search box searches for a
+ * `%` instead of matching everything.
+ *
+ * Truncated to 48 bytes because D1 caps any `LIKE`/`GLOB` pattern at 50, and
+ * the two wrapping `%` count toward that. The request schema enforces the same
+ * bound, but truncating here as well means a future caller that skips the schema
+ * gets a shorter search rather than a database error. A partial pattern can
+ * only return *more* rows than the full term would, never rows that do not match.
+ */
+function likePattern(raw: string): string {
+  const escaped = raw.trim().toLowerCase().replace(/[\\%_]/g, (ch) => `\\${ch}`).slice(0, 48);
+  return `%${escaped}%`;
+}
+
+/**
+ * Interpolate the ORDER BY clause.
+ *
+ * `sort` reaches SQL as text, so it is matched against an allowlist rather than
+ * sanitised — there is no string form of this value that is safe to pass
+ * through unescaped. Unknown keys fall back to `created_at`, which is the
+ * previous hardcoded behaviour.
+ */
+function orderByClause(sort: MonitorSortKey | undefined, order: 'asc' | 'desc' | undefined): string {
+  const key = sort && MONITOR_SORT_KEYS.includes(sort) ? sort : 'created_at';
+  const direction = order === 'asc' ? 'ASC' : 'DESC';
+  return `ORDER BY m.${key} ${direction}, m.id ASC`;
 }
 
 /**
@@ -113,6 +159,7 @@ export async function listWithStatus(
   options: ListOptions & { uptimeDays?: number } = {},
 ): Promise<MonitorWithStatus[]> {
   const limit = Math.min(Math.max(options.limit ?? 200, 1), 500);
+  const offset = Math.max(options.offset ?? 0, 0);
 
   const filters: string[] = [];
   const params: unknown[] = [];
@@ -125,12 +172,19 @@ export async function listWithStatus(
     filters.push('m.active = ?');
     params.push(options.active);
   }
+  if (options.search) {
+    // A DSL monitor has no URL, so the URL half simply does not match for it.
+    filters.push("(LOWER(m.name) LIKE ? ESCAPE '\\' OR LOWER(COALESCE(m.url, '')) LIKE ? ESCAPE '\\')");
+    const pattern = likePattern(options.search);
+    params.push(pattern, pattern);
+  }
 
   const where = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+  const orderBy = orderByClause(options.sort, options.order);
 
   const monitorsResult = await db.query<MonitorRow>(
-    `SELECT * FROM monitors m ${where} ORDER BY m.created_at DESC LIMIT ?`,
-    [...params, limit],
+    `SELECT * FROM monitors m ${where} ${orderBy} LIMIT ? OFFSET ?`,
+    [...params, limit, offset],
   );
 
   const monitors = monitorsResult.rows.map(mapMonitor);

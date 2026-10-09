@@ -138,6 +138,29 @@ const ok = (status = 200, body = 'hi') =>
 
 describe('HTTP monitor engine', () => {
 
+  test('invokes fetch without a receiver', async () => {
+    // `fetch` is a native binding in workerd and throws "Illegal invocation:
+    // function called with incorrect `this` reference" the moment it is called
+    // as a method. Node's `fetch` ignores `this`, so the bug survives the whole
+    // suite and only breaks a deployed Worker. Detecting the receiver with a
+    // plain function is the only way to catch it here — every existing test
+    // injects an arrow function, which cannot observe its own receiver.
+    let receiver: unknown = 'never called';
+    const spy = function (this: unknown) {
+      receiver = this;
+      return Promise.resolve(ok());
+    };
+
+    const result = await runCheck(monitor(), { fetchImpl: spy as unknown as typeof fetch });
+
+    assert.equal(result.status, 'up');
+    assert.equal(
+      receiver,
+      undefined,
+      'fetch was called with a receiver; workerd would reject this with Illegal invocation',
+    );
+  });
+
   test('reports up for a 200 in range', async () => {
     const result = await runCheck(monitor(), { fetchImpl: async () => ok() });
     assert.equal(result.status, 'up');

@@ -331,6 +331,51 @@ describe('notification channels', () => {
     assert.ok(!text.includes('supersecret'));
   });
 
+  test('linking a channel to a monitor requires a valid monitor_id', async () => {
+    const created = await call('/api/monitors', {
+      method: 'POST',
+      headers: asEditor(),
+      body: { name: 'Unlinkable monitor', url: 'https://example.com/health' },
+    });
+    const monitorId = (created.json as { monitor: { id: string } }).monitor.id;
+
+    const { response } = await call(`/api/channels/${channelId}/link`, {
+      method: 'POST',
+      headers: asEditor(),
+      body: { notify_on: 'down' },
+    });
+    assert.equal(response.status, 400, 'a missing monitor_id must be refused');
+
+    const bad = await call(`/api/channels/${channelId}/link?monitor_id=not-a-uuid`, {
+      method: 'POST',
+      headers: asEditor(),
+      body: { notify_on: 'down' },
+    });
+    assert.equal(bad.response.status, 400, 'a malformed monitor_id must be refused');
+
+    const missing = await call(
+      `/api/channels/${channelId}/link?monitor_id=00000000-0000-4000-8000-000000000000`,
+      {
+        method: 'POST',
+        headers: asEditor(),
+        body: { notify_on: 'down' },
+      },
+    );
+    assert.equal(missing.response.status, 404, 'an unknown monitor must 404');
+
+    const ok = await call(`/api/channels/${channelId}/link?monitor_id=${monitorId}`, {
+      method: 'POST',
+      headers: asEditor(),
+      body: { notify_on: 'down' },
+    });
+    assert.equal(ok.response.status, 200);
+
+    await call(`/api/channels/${channelId}/link/${monitorId}`, {
+      method: 'DELETE',
+      headers: asEditor(),
+    });
+  });
+
   test('linking a channel to a monitor is idempotent', async () => {
     const created = await call('/api/monitors', {
       method: 'POST',
@@ -339,11 +384,17 @@ describe('notification channels', () => {
     });
     const monitorId = (created.json as { monitor: { id: string } }).monitor.id;
 
+    // The monitor is named by the query string, not the body. The body used to
+    // carry `channel_id`, which the route wrote straight into the
+    // `monitor_id` column — so the link was created against the channel's own
+    // id and never matched a monitor. Passing the monitor as `channel_id` here
+    // is what made the bug invisible: the endpoint answered 200 while doing
+    // nothing an operator wanted.
     const link = () =>
-      call(`/api/channels/${channelId}/link`, {
+      call(`/api/channels/${channelId}/link?monitor_id=${monitorId}`, {
         method: 'POST',
         headers: asEditor(),
-        body: { channel_id: monitorId, notify_on: 'down', downtime_threshold_s: 60 },
+        body: { notify_on: 'down', downtime_threshold_s: 60 },
       });
 
     assert.equal((await link()).response.status, 200);
@@ -355,6 +406,12 @@ describe('notification channels', () => {
       (c) => c.id === channelId,
     )!;
     assert.equal(channel.monitors.length, 1);
+    // The link must point at the monitor we asked for, not at the channel.
+    assert.equal(
+      (channel.monitors[0] as { monitor_id: string }).monitor_id,
+      monitorId,
+      'link must reference the requested monitor',
+    );
 
     const unlink = await call(`/api/channels/${channelId}/link/${monitorId}`, {
       method: 'DELETE',

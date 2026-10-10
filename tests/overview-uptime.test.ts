@@ -110,6 +110,20 @@ async function seedMonitor(name: string, options: { active: boolean; upChecks: n
   return id;
 }
 
+/**
+ * Record the sweep's materialised status for a monitor.
+ *
+ * The sweep writes one `alert_states` row per monitor on every check, so this
+ * is what the overview reads to count up/down/degraded.
+ */
+async function seedAlertState(monitorId: string, status: 'up' | 'down' | 'degraded') {
+  await db.execute(
+    `INSERT INTO alert_states (monitor_id, current_status, previous_status, down_since, notify_count, updated_at)
+     VALUES (?, ?, NULL, NULL, 0, ?)`,
+    [monitorId, status, nowIso()],
+  );
+}
+
 let cookie = '';
 
 before(async () => {
@@ -184,6 +198,58 @@ describe('overview — weighted uptime', () => {
     assert.ok(
       overview.uptime_24h! < 100 && overview.uptime_24h! > 0,
       `expected a partial uptime from a half-failing monitor, got ${overview.uptime_24h}`,
+    );
+  });
+
+  test('counts status from alert_states, not from check history', async () => {
+    // The optimisation: the overview used to materialise every monitor and join
+    // the latest check per monitor just to count them. It now reads the one-row
+    // -per-monitor `alert_states` table that the sweep already maintains.
+    //
+    // These monitors get an alert state but *no* check rows at all. An
+    // implementation that still joined check history would report zero of
+    // everything, which is precisely the work being removed.
+    //
+    // Assertions are on the delta rather than absolute counts, because earlier
+    // cases in this file share the same database.
+    const before = (await call('/api/monitors/overview', cookie)).json.overview as Overview;
+
+    const healthy = await seedMonitor('Alpha healthy', { active: true, upChecks: 0, downChecks: 0 });
+    const broken = await seedMonitor('Beta broken', { active: true, upChecks: 0, downChecks: 0 });
+    const slow = await seedMonitor('Gamma slow', { active: true, upChecks: 0, downChecks: 0 });
+    const off = await seedMonitor('Delta paused', { active: false, upChecks: 0, downChecks: 0 });
+
+    await seedAlertState(healthy, 'up');
+    await seedAlertState(broken, 'down');
+    await seedAlertState(slow, 'degraded');
+    await seedAlertState(off, 'down'); // stale status on a paused monitor
+
+    const { response, json } = await call('/api/monitors/overview', cookie);
+    assert.equal(response.status, 200);
+    const after = json.overview as Overview;
+
+    assert.equal(after.total - before.total, 4, 'four monitors added');
+    assert.equal(after.up - before.up, 1, 'one healthy active monitor');
+    assert.equal(after.down - before.down, 1, 'one broken active monitor');
+    assert.equal(after.degraded - before.degraded, 1, 'one degraded active monitor');
+    assert.equal(
+      after.paused - before.paused,
+      1,
+      "a paused monitor's status must never be counted, however stale it is",
+    );
+  });
+
+  test('counts a never-checked monitor in total but not in any status bucket', async () => {
+    // No alert_states row and no checks: unknown, not up and not down.
+    await seedMonitor('Omega fresh', { active: true, upChecks: 0, downChecks: 0 });
+
+    const { json } = await call('/api/monitors/overview', cookie);
+    const overview = json.overview as Overview;
+
+    const buckets = overview.up + overview.down + overview.degraded;
+    assert.ok(
+      overview.total > buckets,
+      'a monitor that has never been checked belongs in total but in no status bucket',
     );
   });
 

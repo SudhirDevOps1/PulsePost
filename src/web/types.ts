@@ -199,7 +199,14 @@ export interface Incident {
 
 // --- notification channels ---------------------------------------------------
 
-export type ChannelType = 'webhook' | 'slack' | 'discord';
+/**
+ * Notification transports.
+ *
+ * Derived from the single `CHANNEL_TYPES` list in `shared/schemas.ts`, so the
+ * web client's idea of the set cannot drift from the server's validation or the
+ * database constraint.
+ */
+export type ChannelType = (typeof import('../shared/schemas.ts').CHANNEL_TYPES)[number];
 
 /** One monitor→channel subscription as returned inside a channel. */
 export interface ChannelMonitorLink {

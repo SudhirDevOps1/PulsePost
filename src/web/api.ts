@@ -242,7 +242,17 @@ export const api = {
   channels: () =>
     request<{ channels: import('./types.ts').NotificationChannel[] }>('/channels'),
 
-  createChannel: (input: { type: string; name: string; url: string }) =>
+  /**
+   * Create a notification channel.
+   *
+   * The payload shape depends on the transport -- a URL for Slack, a bot token
+   * and chat id for Telegram, a routing key for PagerDuty. The server is the
+   * discriminator: it accepts each transport's own fields and rejects anything
+   * else, so the client sends the flat object it was handed.
+   */
+  createChannel: (
+    input: { type: string; name: string } & Record<string, string | undefined>,
+  ) =>
     request<{ channel: import('./types.ts').NotificationChannel }>('/channels', {
       method: 'POST',
       body: JSON.stringify(input),

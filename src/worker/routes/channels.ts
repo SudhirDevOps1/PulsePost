@@ -41,14 +41,23 @@ interface ChannelRow {
 
 /** Everything except the secret. */
 function mapChannel(row: ChannelRow): NotificationChannel {
-  const hasUrl = /"url"\s*:\s*"[^"]+"/.test(row.config);
+  const stored = JSON.parse(row.config) as Record<string, unknown>;
+  // Every key is preserved and every value replaced -- not just `url`.
+  // Half the transports have no URL at all, and a Telegram bot token or a
+  // PagerDuty routing key is exactly as serious a credential as a webhook
+  // URL. Masking only the field the original three-channel world happened to
+  // have would have leaked all ten of them in the list response.
+  const redacted: Record<string, string> = {};
+  for (const [key, value] of Object.entries(stored)) {
+    redacted[key] = typeof value === 'string' && value.trim() !== '' ? '***' : '';
+  }
   return {
     id: String(row.id),
     type: row.type as ChannelType,
     name: String(row.name),
-    // Shape is preserved so the UI can tell "configured" from "empty", but the
-    // value itself never leaves the server.
-    config: JSON.stringify({ url: hasUrl ? '***' : '' }),
+    // Shape is preserved so the UI can tell "configured" from "empty", but no
+    // value ever leaves the server.
+    config: JSON.stringify(redacted),
     active: toBool(row.active),
     created_at: String(row.created_at),
   };
@@ -90,9 +99,15 @@ channelRoutes.post('/', requireAuth('editor'), validateJson(createChannelSchema)
 
   const id = crypto.randomUUID();
 
+  // The whole validated body minus `type` and `name` is the config. Building it
+  // by explicit field list would mean a new transport needs an edit here as
+  // well as in the schema and the sender, and the field that someone forgets is
+  // the one that silently does not get stored.
+  const { type, name, ...config } = body;
+
   await db.execute(
     'INSERT INTO notification_channels (id, type, name, config, active, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [id, body.type, body.name, JSON.stringify({ url: body.url }), true, nowIso()],
+    [id, type, name, JSON.stringify(config), true, nowIso()],
   );
 
   await audit(db, {

@@ -22,7 +22,68 @@ export const monitorKindSchema = z.enum(['http', 'dsl']);
 export const userRoleSchema = z.enum(['admin', 'editor', 'viewer']);
 export const incidentStatusSchema = z.enum(['investigating', 'identified', 'monitoring', 'resolved']);
 export const incidentImpactSchema = z.enum(['none', 'minor', 'major', 'critical']);
-export const channelTypeSchema = z.enum(['webhook', 'slack', 'discord']);
+/**
+ * Supported notification transports.
+ *
+ * Kept in sync with the `channels_type_check` constraint by migration
+ * `0002_widen_channel_types.sql`. A type added here without a migration will be
+ * rejected by the database rather than by validation, so the constraint is the
+ * real source of truth and this list exists to fail earlier and more clearly.
+ */
+export const CHANNEL_TYPES = [
+  'webhook',
+  'slack',
+  'discord',
+  'mattermost',
+  'rocketchat',
+  'telegram',
+  'ntfy',
+  'gotify',
+  'stoat',
+  'pushover',
+  'pushbullet',
+  'pagerduty',
+  'opsgenie',
+] as const;
+
+export const channelTypeSchema = z.enum(CHANNEL_TYPES);
+
+/** Human labels for the UI. Keep in the same order as `CHANNEL_TYPES`. */
+export const CHANNEL_TYPE_LABELS: Record<(typeof CHANNEL_TYPES)[number], string> = {
+  webhook: 'Generic webhook',
+  slack: 'Slack',
+  discord: 'Discord',
+  mattermost: 'Mattermost',
+  rocketchat: 'Rocket.Chat',
+  telegram: 'Telegram',
+  ntfy: 'ntfy',
+  gotify: 'Gotify',
+  stoat: 'Stoat',
+  pushover: 'Pushover',
+  pushbullet: 'Pushbullet',
+  pagerduty: 'PagerDuty',
+  opsgenie: 'Opsgenie',
+};
+
+/**
+ * One-line description of what each transport needs, shown under the type
+ * picker so nobody has to guess which field is a secret and which is a label.
+ */
+export const CHANNEL_TYPE_HINTS: Record<(typeof CHANNEL_TYPES)[number], string> = {
+  webhook: 'Any HTTP endpoint. Receives a JSON POST on each alert.',
+  slack: 'Slack incoming webhook URL.',
+  discord: 'Discord webhook URL.',
+  mattermost: 'Mattermost incoming webhook URL.',
+  rocketchat: 'Rocket.Chat incoming webhook URL.',
+  telegram: 'Bot token from @BotFather, plus a chat ID.',
+  ntfy: 'Server URL (ntfy.sh by default) and a topic name.',
+  gotify: 'Server URL and an application token.',
+  stoat: 'Server URL and a channel webhook token.',
+  pushover: 'Your user key and an application token.',
+  pushbullet: 'An access token from your Pushbullet account.',
+  pagerduty: 'Integration routing key from an Events API v2 integration.',
+  opsgenie: 'API key with alert permissions.',
+};
 
 /**
  * A monitor target.
@@ -280,38 +341,123 @@ export const updateIncidentSchema = z
 
 // --- notification channels --------------------------------------------------
 
-export const createChannelSchema = z
-  .object({
-    type: channelTypeSchema,
-    name: z.string().trim().min(1).max(120),
-    url: z
+/**
+ * A channel endpoint must be HTTPS.
+ *
+ * Plain HTTP is allowed only for localhost, which keeps the documented
+ * `docker compose` path working without opening the door to shipping channel
+ * credentials in clear text. Credentials embedded in the URL are refused
+ * outright -- they end up in logs and proxy history.
+ */
+const httpsUrl = z
+  .string()
+  .trim()
+  .min(1)
+  .max(2048)
+  .url('Must be a valid URL')
+  .refine((v) => {
+    try {
+      const p = new URL(v);
+      return p.protocol === 'https:' || p.hostname === 'localhost';
+    } catch {
+      return false;
+    }
+  }, 'Must use https:// (http:// only allowed for localhost)')
+  .refine((v) => {
+    try {
+      return !new URL(v).username && !new URL(v).password;
+    } catch {
+      return false;
+    }
+  }, 'Credentials in the URL are not allowed');
+
+const channelName = z.string().trim().min(1).max(120);
+
+/** Secret-ish values: long enough to be real, short enough to stay sane. */
+const secret = (label: string) => z.string().trim().min(8).max(300, `${label} looks too long`);
+
+/**
+ * Channel creation, discriminated on `type`.
+ *
+ * A single flat shape used to take a mandatory `url`, which does not describe
+ * half the transports: Telegram wants a bot token and a chat ID, PagerDuty
+ * wants a routing key, and none of them is a URL. Making every transport carry
+ * a dummy URL would be worse than saying what each one actually needs.
+ *
+ * The three original transports are unchanged, so existing callers keep
+ * working byte for byte.
+ */
+export const createChannelSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('webhook'), name: channelName, url: httpsUrl }).strict(),
+  z.object({ type: z.literal('slack'), name: channelName, url: httpsUrl }).strict(),
+  z.object({ type: z.literal('discord'), name: channelName, url: httpsUrl }).strict(),
+  z.object({ type: z.literal('mattermost'), name: channelName, url: httpsUrl }).strict(),
+  z.object({ type: z.literal('rocketchat'), name: channelName, url: httpsUrl }).strict(),
+  z.object({
+    type: z.literal('telegram'),
+    name: channelName,
+    botToken: secret('Bot token'),
+    chatId: z.string().trim().min(1).max(64),
+  }).strict(),
+  z.object({
+    type: z.literal('ntfy'),
+    name: channelName,
+    server: httpsUrl,
+    // ntfy's own documented rule: letters, digits, underscore and dash only,
+    // 64 characters. Anything else and the publish call silently 404s.
+    topic: z
       .string()
       .trim()
-      .min(1)
-      .max(2048)
-      .url('Must be a valid URL')
-      .refine((v) => {
-        try {
-          const p = new URL(v);
-          return p.protocol === 'https:' || p.hostname === 'localhost';
-        } catch {
-          return false;
-        }
-      }, 'Webhook URLs must use https:// (http:// only allowed for localhost)')
-      .refine((v) => {
-        try {
-          return !new URL(v).username && !new URL(v).password;
-        } catch {
-          return false;
-        }
-      }, 'Credentials in the URL are not allowed'),
-  })
-  .strict();
+      .regex(/^[-_A-Za-z0-9]{1,64}$/, 'Topic may contain letters, digits, - and _ only (max 64)'),
+  }).strict(),
+  z.object({
+    type: z.literal('gotify'),
+    name: channelName,
+    server: httpsUrl,
+    token: secret('Token'),
+  }).strict(),
+  z.object({
+    type: z.literal('stoat'),
+    name: channelName,
+    server: httpsUrl,
+    token: secret('Token'),
+  }).strict(),
+  z.object({
+    type: z.literal('pushover'),
+    name: channelName,
+    userKey: secret('User key'),
+    appToken: secret('Application token'),
+  }).strict(),
+  z.object({
+    type: z.literal('pushbullet'),
+    name: channelName,
+    accessToken: secret('Access token'),
+  }).strict(),
+  z.object({
+    type: z.literal('pagerduty'),
+    name: channelName,
+    routingKey: secret('Routing key'),
+  }).strict(),
+  z.object({
+    type: z.literal('opsgenie'),
+    name: channelName,
+    apiKey: secret('API key'),
+    /** Optional: without a team the alert routes to the account default. */
+    team: z.string().trim().max(100).optional(),
+  }).strict(),
+]);
 
+/**
+ * Partial update.
+ *
+ * A URL is only offered when the transport actually has one; the rest of a
+ * channel's secrets are changed through a fresh create rather than a patch, so
+ * a partial edit can never half-apply a credential set.
+ */
 export const updateChannelSchema = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
-    url: createChannelSchema.shape.url.optional(),
+    url: httpsUrl.optional(),
     active: z.coerce.boolean().optional(),
   })
   .strict();

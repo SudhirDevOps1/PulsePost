@@ -74,7 +74,7 @@ Poore gallery: [`docs/images/`](docs/images/) — har page light aur dark dono m
 
 **Operations**
 - Incidents — timeline updates, auto `resolved_at` derivation
-- Notification channels — Slack, Discord, generic webhook (HMAC-signed option)
+- Notification channels — 13 transports, per-monitor policy (see below)
 - Multi-user — admin / editor / viewer roles, TOTP 2FA, PBKDF2 passwords
 - Audit log — har destructive action record hota hai
 
@@ -175,6 +175,38 @@ Isi wajah se:
 - **Session token ka hash** store hota hai, token nahi — lookup chhota rehta hai.
 
 Total cold payload ~300 KB gzip.
+
+---
+
+## Notification channels
+
+Har alert 13 transports me ja sakti hai. Config write-only hai — store to hota
+hai, par API kabhi return nahi karta.
+
+| Transport | Chahiye |
+|---|---|
+| `webhook` | Koi bhi HTTPS endpoint |
+| `slack`, `discord`, `mattermost`, `rocketchat` | Incoming webhook URL |
+| `telegram` | Bot token + chat ID |
+| `ntfy` | Server URL + topic |
+| `gotify` | Server URL + application token |
+| `stoat` | Server URL + channel webhook token |
+| `pushover` | User key + application token |
+| `pushbullet` | Access token |
+| `pagerduty` | Events API v2 routing key |
+| `opsgenie` | API key (+ optional team) |
+
+**PagerDuty/Opsgenie** stateful hain: ek outage pe ek incident khulta hai, phir
+`resolve` hota hai — `dedup_key`/`alias` se, warna ek ghante ka outage 60 alag
+incidents bana dega.
+
+Mattermost aur Rocket.Chat Slack-compatible webhooks consume karte hain, isliye
+wahi payload builder use karte hain.
+
+> ⚠️ **Format verification:** PagerDuty aur ntfy ke payloads official docs se
+> verify kiye gaye. Baaki 11 documented-standard APIs par likhe gaye hain, par
+> is environment me unki docs fetch nahi ho payin. Live credentials ke saath
+> ek-ek karke test kar lein — har channel ka **Send test** button hai.
 
 ---
 

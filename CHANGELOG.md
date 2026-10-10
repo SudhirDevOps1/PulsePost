@@ -1,9 +1,66 @@
-# Changelog
+## [Unreleased]
 
-PulsePost ka pura itihas. Format [Keep a Changelog](https://keepachangelog.com/) ke
-mutabiq hai, versions [Semantic Versioning](https://semver.org/) ke saath.
+### Added
 
----
+- **Ten notification transports**, taking the total to thirteen. Telegram, ntfy,
+  Gotify, Stoat, Pushover, Pushbullet, PagerDuty, Opsgenie, Mattermost and
+  Rocket.Chat join webhook/Slack/Discord.
+
+  Channel creation is now a discriminated union on `type`, because a mandatory
+  `url` never described half of these -- a Telegram bot token and a PagerDuty
+  routing key are not URLs. The original three keep their exact shape, so
+  existing callers are unchanged.
+
+  PagerDuty and Opsgenie are stateful: the same dedup key / alias for one outage
+  produces one `trigger` and one `resolve`, rather than a separate incident per
+  check for as long as a monitor stays down.
+
+  Mattermost and Rocket.Chat consume the Slack incoming-webhook shape, so they
+  reuse that builder instead of carrying a near-identical copy that would drift
+  the first time Slack changed theirs.
+
+  Migration `0002_widen_channel_types` rebuilds `notification_channels` to widen
+  the CHECK constraint -- SQLite cannot ALTER one. Existing rows are copied
+  first and `created_at` is carried, so channel ordering does not shift.
+
+- `CHANNEL_TYPES`, `CHANNEL_TYPE_LABELS` and `CHANNEL_TYPE_HINTS` are the single
+  source for the transport set. `ChannelType` is derived from it in both
+  `shared/types.ts` and `web/types.ts`, so the client cannot fall behind the
+  server's validation.
+
+### Changed
+
+- **The overview is computed as a summary.** It used to call
+  `listWithStatus({ limit: 500 })` -- materialising 500 monitor rows and joining
+  the latest check per monitor, only to count them and discard them. The
+  dashboard fetches the monitor list separately, so every page view paid twice.
+
+  Status now comes from `alert_states`, which the sweep upserts on *every* check
+  rather than only on transitions, so it is always current. A LEFT JOIN keeps a
+  never-checked monitor in `total` while leaving it out of every status bucket,
+  matching the old `current_status: null` behaviour.
+
+- **Channel secrets are redacted by key, not by name.** `mapChannel` replaced
+  only `url`, because that was all the original three transports had. Ten of the
+  new ones have no URL at all, and a bot token or routing key is exactly as
+  serious a credential -- masking `url` alone would have leaked every one of them
+  in the list response.
+
+### Verified
+
+- 182/182 tests (17 new). The migration test asserts a pre-existing row survives
+  the table rebuild, that all thirteen transports are accepted, and that
+  `carrier-pigeon` is still refused.
+- PagerDuty and ntfy payload formats were checked against official
+  documentation. The other eleven are written against their documented-standard
+  APIs but their docs could not be fetched in this environment; the README says
+  so rather than implying uniform verification. Each channel has a Send test
+  button.
+
+- **AGENTS.md**, the first instruction file for this repository: the migration
+  bundling trap, the Tailwind `var()` trap, the Node/workerd divergences, the D1
+  rows-read billing model, and the two vacuous tests written and caught while
+  fixing the dashboard bugs.
 
 ## [1.0.0]
 

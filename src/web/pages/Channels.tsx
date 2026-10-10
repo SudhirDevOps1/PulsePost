@@ -3,6 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '../api.ts';
 import type { ChannelType, MonitorWithStatus, NotificationChannel } from '../types.ts';
 import {
+  CHANNEL_TYPES,
+  CHANNEL_TYPE_HINTS,
+  CHANNEL_TYPE_LABELS,
+} from '../../shared/schemas.ts';
+import {
   Badge,
   Button,
   EmptyState,
@@ -27,16 +32,56 @@ import {
  * a literal `***`.
  */
 
-const TYPE_LABEL: Record<ChannelType, string> = {
-  webhook: 'Webhook',
-  slack: 'Slack',
-  discord: 'Discord',
-};
+/**
+ * Which config fields each transport asks for.
+ *
+ * This is a presentation table, not a second source of truth: the server
+ * validates with the discriminated union in `shared/schemas.ts` and the
+ * missing-field name in a Zod issue maps straight onto `key` here. A transport
+ * whose fields are listed wrongly shows an extra box or hides a required one,
+ * but it cannot create an invalid channel.
+ */
+interface ChannelField {
+  key: string;
+  label: string;
+  placeholder?: string;
+  /** Password-style input for anything that is a credential. */
+  secret?: boolean;
+  type?: 'text' | 'url';
+}
 
-const TYPE_HINT: Record<ChannelType, string> = {
-  webhook: 'Any HTTP endpoint. Receives a JSON POST on each alert.',
-  slack: 'A Slack incoming-webhook URL.',
-  discord: 'A Discord webhook URL.',
+const CHANNEL_FIELDS: Record<ChannelType, ChannelField[]> = {
+  webhook: [{ key: 'url', label: 'URL', placeholder: 'https://hooks.example.com/...', type: 'url' }],
+  slack: [{ key: 'url', label: 'Incoming webhook URL', placeholder: 'https://hooks.slack.com/services/...', type: 'url' }],
+  discord: [{ key: 'url', label: 'Webhook URL', placeholder: 'https://discord.com/api/webhooks/...', type: 'url' }],
+  mattermost: [{ key: 'url', label: 'Incoming webhook URL', placeholder: 'https://mattermost.example.com/hooks/...', type: 'url' }],
+  rocketchat: [{ key: 'url', label: 'Incoming webhook URL', placeholder: 'https://chat.example.com/hooks/...', type: 'url' }],
+  telegram: [
+    { key: 'botToken', label: 'Bot token', placeholder: '123456789:AAExxxxx', secret: true },
+    { key: 'chatId', label: 'Chat ID', placeholder: '-1001234567890' },
+  ],
+  ntfy: [
+    { key: 'server', label: 'Server', placeholder: 'https://ntfy.sh', type: 'url' },
+    { key: 'topic', label: 'Topic', placeholder: 'pulsepost-alerts' },
+  ],
+  gotify: [
+    { key: 'server', label: 'Server', placeholder: 'https://gotify.example.com', type: 'url' },
+    { key: 'token', label: 'Application token', secret: true },
+  ],
+  stoat: [
+    { key: 'server', label: 'Server', placeholder: 'https://api.stoat.chat', type: 'url' },
+    { key: 'token', label: 'Channel webhook token', secret: true },
+  ],
+  pushover: [
+    { key: 'userKey', label: 'User key', secret: true },
+    { key: 'appToken', label: 'Application token', secret: true },
+  ],
+  pushbullet: [{ key: 'accessToken', label: 'Access token', secret: true }],
+  pagerduty: [{ key: 'routingKey', label: 'Integration routing key', secret: true }],
+  opsgenie: [
+    { key: 'apiKey', label: 'API key', secret: true },
+    { key: 'team', label: 'Team (optional)', placeholder: 'ops' },
+  ],
 };
 
 const NOTIFY_EVENTS = ['down', 'up', 'degraded'] as const;
@@ -51,7 +96,9 @@ export function ChannelsPage() {
 
   const [name, setName] = useState('');
   const [type, setType] = useState<ChannelType>('webhook');
-  const [url, setUrl] = useState('');
+  // One value bag for every transport. Switching type clears it, so a token
+  // typed for Telegram is never posted as a PagerDuty routing key.
+  const [config, setConfig] = useState<Record<string, string>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Per-channel subscription editor.
@@ -87,9 +134,9 @@ export function ChannelsPage() {
     setBusy(true);
     setFieldErrors({});
     try {
-      await api.createChannel({ type, name, url });
+      await api.createChannel({ type, name, ...config });
       setName('');
-      setUrl('');
+      setConfig({});
       setNotice('Channel created — now attach it to a monitor below');
       await load();
     } catch (cause) {
@@ -225,25 +272,42 @@ export function ChannelsPage() {
             />
           </Field>
 
-          <Field label="Type">
-            <select className={selectClass} value={type} onChange={(e) => setType(e.target.value as ChannelType)}>
-              {(['webhook', 'slack', 'discord'] as ChannelType[]).map((value) => (
+          <Field label="Type" hint={CHANNEL_TYPE_HINTS[type]}>
+            <select
+              className={selectClass}
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value as ChannelType);
+                setConfig({});
+                setFieldErrors({});
+              }}
+            >
+              {CHANNEL_TYPES.map((value) => (
                 <option key={value} value={value}>
-                  {TYPE_LABEL[value]}
+                  {CHANNEL_TYPE_LABELS[value]}
                 </option>
               ))}
             </select>
           </Field>
 
-          <Field label="URL" hint={TYPE_HINT[type]} error={fieldErrors.url} className="sm:col-span-2">
-            <input
-              className={inputClass}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://hooks.example.com/..."
-              type="url"
-            />
-          </Field>
+          {CHANNEL_FIELDS[type].map((field) => (
+            <Field
+              key={field.key}
+              label={field.label}
+              error={fieldErrors[field.key]}
+              className="sm:col-span-2"
+            >
+              <input
+                className={inputClass}
+                value={config[field.key] ?? ''}
+                onChange={(e) => setConfig((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                placeholder={field.placeholder}
+                type={field.secret ? 'password' : (field.type ?? 'text')}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </Field>
+          ))}
         </div>
 
         <div className="mt-4">
@@ -333,10 +397,10 @@ function ChannelCard({
   return (
     <Panel
       title={channel.name}
-      subtitle={`${TYPE_LABEL[channel.type]} · ${links.length} monitor${links.length === 1 ? '' : 's'}`}
+      subtitle={`${CHANNEL_TYPE_LABELS[channel.type]} · ${links.length} monitor${links.length === 1 ? '' : 's'}`}
       actions={
         <>
-          <Badge>{TYPE_LABEL[channel.type]}</Badge>
+          <Badge>{CHANNEL_TYPE_LABELS[channel.type]}</Badge>
           {channel.active ? (
             <Badge color="var(--color-up)">active</Badge>
           ) : (

@@ -92,43 +92,68 @@ monitorRoutes.get('/', validateQuery(listMonitorsQuerySchema), async (c) => {
 
 monitorRoutes.get('/overview', async (c) => {
   const db = c.get('db');
-  const monitors = await repo.listWithStatus(db, { limit: 500 });
+  const since24h = new Date(Date.now() - 86_400_000).toISOString();
+  const since90d = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
 
-  const total = monitors.length;
-  const active = monitors.filter((monitor) => monitor.active);
+  /**
+   * The overview is a summary, so it is computed as a summary.
+   *
+   * This used to call `listWithStatus({ limit: 500 })` -- materialising 500
+   * monitor rows plus a latest-check-per-monitor join, only to count them and
+   * throw them away. The dashboard fetches the monitor list separately, so
+   * every page view paid for the same work twice and gained nothing from it.
+   *
+   * `alert_states` is the materialised current status: the sweep upserts one row
+   * per monitor on *every* check, not only on transitions, so it is always
+   * current. Counting from a one-row-per-monitor table replaces a join that
+   * walked check history.
+   *
+   * A monitor that has never been checked has no `alert_states` row. The LEFT
+   * JOIN keeps it in `total` while leaving it out of up/down/degraded, which is
+   * exactly what the per-monitor version did with `current_status: null`.
+   */
+  const [counts, statuses, uptime24h, uptime90d, incidents, lastSweep] = await Promise.all([
+    db.query<{ total: number; active: number }>(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN active THEN 1 ELSE 0 END) AS active
+         FROM monitors`,
+    ),
+    db.query<{ status: string | null; n: number }>(
+      `SELECT a.current_status AS status, COUNT(*) AS n
+         FROM monitors m
+         LEFT JOIN alert_states a ON a.monitor_id = m.id
+        WHERE m.active = ?
+        GROUP BY a.current_status`,
+      [true],
+    ),
+    // Weighted across ACTIVE monitors only.
+    //
+    // A paused monitor reports no successful checks, so folding it in punished
+    // the instance for a monitor somebody deliberately switched off: 50% uptime
+    // sitting directly under the word "Operational".
+    windowUptime(db, since24h),
+    // 90 days comes from the nightly rollup -- about 90 rows per monitor instead
+    // of walking raw check history. The raw window is never consulted here.
+    rollupUptime(db, since90d),
+    db.query<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM incidents WHERE status <> 'resolved'`,
+    ),
+    db.query<{ value: string }>(
+      `SELECT value FROM app_settings WHERE key = 'last_sweep_at'`,
+    ),
+  ]);
+
   let up = 0;
   let down = 0;
   let degraded = 0;
-  for (const monitor of active) {
-    if (monitor.current_status === 'up') up += 1;
-    else if (monitor.current_status === 'degraded') degraded += 1;
-    else if (monitor.current_status === 'down') down += 1;
+  for (const row of statuses.rows) {
+    if (row.status === 'up') up += Number(row.n);
+    else if (row.status === 'degraded') degraded += Number(row.n);
+    else if (row.status === 'down') down += Number(row.n);
   }
 
-  // Weighted by *active* monitors only.
-  //
-  // A paused monitor reports `uptime_24h: 0`, because it is not being checked
-  // and therefore has no successful checks to divide by. Averaging that in
-  // punishes the instance for a monitor somebody deliberately switched off:
-  // one healthy monitor plus one paused one reported 50% uptime while the
-  // status word directly above it read "Operational". The two tiles were
-  // describing the same fleet and disagreeing.
-  //
-  // A monitor that is switched off is not evidence of downtime, so it must not
-  // enter the denominator at all. With no active monitors the result stays
-  // `null`, which the UI already renders as "—" instead of a misleading zero.
-  const uptimeBasis = active.map((monitor) => monitor.uptime_24h);
-  const weighted24h = average(uptimeBasis);
-  const weighted90d = average(active.map((monitor) => monitor.uptime_90d));
-  const avgLatency = await averageLatency24h(db);
-
-  const incidents = await db.query<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM incidents WHERE status <> 'resolved'`,
-  );
-
-  const lastSweep = await db.query<{ value: string }>(
-    `SELECT value FROM app_settings WHERE key = 'last_sweep_at'`,
-  );
+  const total = Number(counts.rows[0]?.total ?? 0);
+  const activeCount = Number(counts.rows[0]?.active ?? 0);
 
   return c.json({
     overview: {
@@ -136,16 +161,58 @@ monitorRoutes.get('/overview', async (c) => {
       up,
       down,
       degraded,
-      paused: total - active.length,
-      uptime_24h: weighted24h,
-      uptime_90d: weighted90d,
-      avg_response_time_ms: avgLatency,
+      paused: total - activeCount,
+      uptime_24h: uptime24h.rows[0]?.uptime ?? null,
+      uptime_90d: uptime90d.rows[0]?.uptime ?? null,
+      avg_response_time_ms: await averageLatency24h(db),
       active_incidents: Number(incidents.rows[0]?.n ?? 0),
       last_sweep_at: lastSweep.rows[0]?.value ?? null,
       next_sweep_at: new Date(Date.now() + 60_000).toISOString(),
     },
   });
 });
+
+/**
+ * Weighted uptime from raw checks, active monitors only.
+ *
+ * One row out rather than one per monitor. The caller wants a single figure,
+ * and aggregating in SQL weights by check volume -- which is what the previous
+ * implementation produced by averaging after a per-monitor pass, since monitors
+ * accumulate checks at different rates.
+ */
+async function windowUptime(db: DatabaseAdapter, since: string) {
+  return db.query<{ total: number; up: number; uptime: number | null }>(
+    `SELECT COUNT(*) AS total,
+            SUM(CASE WHEN c.status = 'up' THEN 1 ELSE 0 END) AS up,
+            CASE WHEN COUNT(*) = 0 THEN NULL
+                 ELSE ROUND(SUM(CASE WHEN c.status = 'up' THEN 1 ELSE 0 END) * 10000.0 / COUNT(*)) / 100
+            END AS uptime
+       FROM checks c
+       JOIN monitors m ON m.id = c.monitor_id
+      WHERE m.active = ? AND c.checked_at >= ? AND c.status <> 'degraded'`,
+    [true, since],
+  );
+}
+
+/**
+ * Weighted uptime from the nightly rollup, active monitors only.
+ *
+ * NULL rather than zero when there is no history: on a fresh instance the
+ * honest answer is "we do not know yet", and the UI already renders that as an em dash.
+ */
+async function rollupUptime(db: DatabaseAdapter, sinceDate: string) {
+  return db.query<{ total: number; up: number; uptime: number | null }>(
+    `SELECT SUM(d.total_checks) AS total,
+            SUM(d.up_checks) AS up,
+            CASE WHEN SUM(d.total_checks) IS NULL OR SUM(d.total_checks) = 0 THEN NULL
+                 ELSE ROUND(SUM(d.up_checks) * 10000.0 / SUM(d.total_checks)) / 100
+            END AS uptime
+       FROM daily_status d
+       JOIN monitors m ON m.id = d.monitor_id
+      WHERE m.active = ? AND d.date >= ?`,
+    [true, sinceDate],
+  );
+}
 
 /** Per-colo rollup for the edge map. */
 monitorRoutes.get('/edge', async (c) => {

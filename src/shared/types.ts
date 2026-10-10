@@ -8,7 +8,14 @@ export type MonitorKind = 'http' | 'dsl';
 export type UserRole = 'admin' | 'editor' | 'viewer';
 export type IncidentStatus = 'investigating' | 'identified' | 'monitoring' | 'resolved';
 export type IncidentImpact = 'none' | 'minor' | 'major' | 'critical';
-export type ChannelType = 'webhook' | 'slack' | 'discord';
+/**
+ * Notification transports.
+ *
+ * Derived from `CHANNEL_TYPES` in `schemas.ts` rather than restated, so the
+ * type, the validation schema and the migration constraint cannot drift apart
+ * without the compiler noticing.
+ */
+export type ChannelType = (typeof import('./schemas.ts').CHANNEL_TYPES)[number];
 
 export interface Monitor {
   id: string;

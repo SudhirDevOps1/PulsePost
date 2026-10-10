@@ -1,5 +1,64 @@
 ## [Unreleased]
 
+### Fixed
+
+- **A fresh deployment spent its entire daily D1 row allowance on its first
+  day.** Measured on the live instance: **5M rows read in 24 hours** against a
+  5M free-tier allowance, from 39k queries -- about 128 rows per query, where a
+  list call should cost tens.
+
+  The cause is a fallback that is correct on a mature instance and ruinous on a
+  new one. `listWithStatus` reads `daily_status` first and scans the entire
+  retained `checks` table for any monitor it cannot find a rollup row for. A new
+  deployment has no rollup rows at all until its first nightly job, so for up to
+  twenty-four hours *every* dashboard poll did a full-history scan -- to render a
+  90-day uptime figure that honestly displays an em dash, because there is no
+  data for it. The dashboard calls the function twice per page view.
+
+  `daily_status` is now folded once an hour rather than once a night, gated on
+  the UTC minute being 0. A new instance has real bars within the hour instead of
+  at the next midnight, and the fallback stops firing. The rollup also runs on
+  the path where no monitor is active: "nothing is being checked" and "there is
+  nothing to report" are different states, and a deployment whose monitors are
+  all paused has real history the status page is trying to show.
+
+  This also fills the empty status-page bars, which were a symptom of the same
+  gap rather than a separate problem.
+
+### Changed
+
+- **`runSweep` accepts an injectable clock.** The rollup gate is
+  `getUTCMinutes() === 0`, which is the entire mechanism. Without a seam there
+  that condition was testable only by waiting for the top of an hour, so the
+  assertion protecting the row allowance would have been skipped or made to pass
+  for the wrong reason.
+
+- **`aggregateDaily`'s comment described a different algorithm from its query.**
+  It claimed `ON CONFLICT ... DO UPDATE` used "additive aggregates"; the
+  statements are assignments -- `total_checks = excluded.total_checks` -- over a
+  fresh recompute of the day, so re-running is a no-op rather than a doubling.
+  Taken at face value the comment reads as "do not call this twice", which is
+  precisely the belief that would have caused the hourly fix above to be
+  rejected for a reason that does not exist.
+
+### Verified
+
+- 185/185 tests (3 new in `tests/hourly-rollup.test.ts`), typecheck clean,
+  `pnpm verify` exit 0.
+- The new tests were confirmed to **fail against the pre-fix behaviour** (2 of 3
+  fail with the hourly call disabled) rather than merely passing alongside it.
+- One of them pins that a second rollup does not double the totals, which is the
+  question that decides whether running this hourly is safe at all.
+
+### Not fixed, deliberately
+
+The fallback itself is untouched. It is what makes a fresh instance able to show
+*something* before its first rollup, and bounding it would change what that is.
+The cost was coming from it running continuously for a day, not from it existing.
+
+
+## [Unreleased]
+
 ### Added
 
 - **Real rasterised icons, generated from the SVG.** `node scripts/make-icons.mjs`

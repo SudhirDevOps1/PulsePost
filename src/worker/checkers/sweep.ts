@@ -67,8 +67,19 @@ export interface SweepResult {
 export async function runSweep(
   db: DatabaseAdapter,
   options: SweepOptions,
+  /** Injected clock; defaults to now. See the note on `startedAt` below. */
+  now: number = Date.now(),
 ): Promise<SweepResult> {
-  const startedAt = Date.now();
+  /*
+   * Injectable so a test can place the sweep on a specific minute of the hour.
+   *
+   * `runHourlyRollup` below fires only when the UTC minute is 0, which is the
+   * whole mechanism. Without a seam here that condition is untestable except by
+   * waiting until the top of an hour, so a test asserting the rollup exists --
+   * the assertion that protects the five-million-row daily allowance -- would
+   * have to be either skipped or made to pass for the wrong reason.
+   */
+  const startedAt = now;
 
   const result: SweepResult = {
     checked: 0,
@@ -84,6 +95,11 @@ export async function runSweep(
 
   const monitors = await listActiveForSweep(db, options.checksPerRun);
   if (monitors.length === 0) {
+    // Still roll up. "Nothing is being checked" and "there is nothing to
+    // report" are different states: a deployment whose monitors are all paused
+    // has real history that the status page is trying to show, and skipping the
+    // rollup here leaves it permanently one night behind.
+    await runHourlyRollup(db, startedAt);
     await runMaintenance(db, options, startedAt, result);
     result.durationMs = Date.now() - startedAt;
     return result;
@@ -174,9 +190,52 @@ async function withConcurrency<T, R>(
     result.notified += sent;
   }
 
+  await runHourlyRollup(db, startedAt);
   await runMaintenance(db, options, startedAt, result);
   result.durationMs = Date.now() - startedAt;
   return result;
+}
+
+/**
+ * Fold today's checks into `daily_status` once an hour.
+ *
+ * Why this is not merely part of nightly maintenance
+ * ---------------------------------------------------
+ * `daily_status` is the cheap answer to every long-window uptime question: one
+ * row per monitor per day. Without it, `listWithStatus` falls back to scanning
+ * the entire retained `checks` table -- once per list call, for every monitor it
+ * cannot find a rollup row for.
+ *
+ * That fallback is fine on a mature instance and ruinous on a fresh one. A new
+ * deployment has no rollup rows at all until the first nightly job, so for up to
+ * twenty-four hours *every* dashboard poll scans the full retention window. At a
+ * five-minute interval and two monitors that is roughly 2,000 rows per request,
+ * and an ordinary day of browsing is thousands of requests. It is a precise way
+ * to spend an entire free-tier daily row allowance while the dashboard honestly
+ * shows an em dash for 90-day uptime.
+ *
+ * The rollup is already idempotent -- it upserts with additive aggregates -- so
+ * running it more often is safe. Once an hour is the cadence: cheap enough to be
+ * irrelevant next to the checks themselves, and fast enough that a new instance
+ * has real bars within the hour instead of at the next midnight.
+ *
+ * Gating on `minute === 0` rather than tracking a last-run timestamp keeps the
+ * Worker stateless. A missed tick costs an hour of freshness, which is a fair
+ * trade for not spending a database read just to decide whether to work.
+ */
+async function runHourlyRollup(db: DatabaseAdapter, startedAt: number): Promise<void> {
+  const at = new Date(startedAt);
+  if (at.getUTCMinutes() !== 0) return;
+
+  try {
+    const rolled = await aggregateDaily(db);
+    if (rolled > 0) {
+      console.log(`[rollup] folded ${rolled} monitor(s) into daily_status`);
+    }
+  } catch (error) {
+    // Never let a reporting concern fail a sweep that already recorded checks.
+    console.error('[rollup] failed:', error);
+  }
 }
 
 interface SweepCheck {
@@ -422,10 +481,23 @@ async function runMaintenance(
 /**
  * Fold today's raw checks into `daily_status`.
  *
- * Uses `ON CONFLICT ... DO UPDATE` with additive aggregates so re-running is
- * safe. `avg_response_time_ms` is maintained as a weighted mean via
- * `(avg * total + new_sum) / (total + new_count)`, which needs only the columns
- * already stored — no cross-engine window functions required.
+ * Recomputes the whole day and *replaces* the stored row:
+ * `ON CONFLICT ... DO UPDATE SET total_checks = excluded.total_checks`. Every
+ * aggregate is an assignment, not a sum, so running this twice over unchanged
+ * data is a no-op rather than a doubling.
+ *
+ * That property is load-bearing rather than incidental. This used to be called
+ * only from the nightly job, and its comment claimed the upsert used "additive
+ * aggregates" -- which is false, and reads exactly like a warning that the
+ * function must not be called twice. Taking that at face value, the obvious fix
+ * for a new instance burning its whole daily row allowance (see `runHourlyRollup`)
+ * would have been rejected for a reason that does not exist. A comment that
+ * describes a different algorithm from the one in the query does not stay
+ * harmless for long.
+ *
+ * p95 is taken from the raw rows for today only, bounded by `total * 0.05`, so
+ * the cost stays proportional to the day's check count rather than to anything
+ * unbounded.
  */
 export async function aggregateDaily(db: DatabaseAdapter): Promise<number> {
   const today = nowDateExpression(db.dialect);

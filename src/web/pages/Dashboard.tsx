@@ -7,6 +7,7 @@ import { EdgeMap } from '../components/EdgeMap.tsx';
 import { LatencyChart } from '../components/LatencyChart.tsx';
 import { MonitorCard } from '../components/MonitorCard.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { usePolling } from '../hooks/usePolling.ts';
 import {
   Button,
   EmptyState,
@@ -116,9 +117,11 @@ export function Dashboard() {
 
   useEffect(() => {
     void load();
-    const timer = setInterval(load, 30_000);
-    return () => clearInterval(timer);
   }, [load]);
+
+  // Suspends while the tab is hidden rather than quietly spending the free
+  // allowance on a page nobody is looking at.
+  usePolling(load, 30_000);
 
   async function toggle(id: string) {
     // Optimistic, as before: pausing should feel instant. `load()` below is the

@@ -1,16 +1,18 @@
 <div align="center">
 
+<img src="public/favicon.svg" alt="PulsePost" width="96" height="96">
+
 # PulsePost
 
-**Ek Cloudflare Worker. Poora uptime monitor. Paanch database. Zero vendor lock-in.**
+**Ek Cloudflare Worker. Poora uptime monitor. Chhe database. Zero vendor lock-in.**
 
-[![tests](https://img.shields.io/badge/tests-157%20passing-16a34a?style=flat-square)](#)
+[![tests](https://img.shields.io/badge/tests-182%20passing-16a34a?style=flat-square)](#)
 [![workers](https://img.shields.io/badge/Cloudflare-Workers-orange?style=flat-square)](https://workers.cloudflare.com)
 [![d1](https://img.shields.io/badge/database-6%20providers-7c6be8?style=flat-square)](#database-provider-badlo)
 [![license](https://img.shields.io/badge/license-MIT-14b8a6?style=flat-square)](#license)
 [![bundle](https://img.shields.io/badge/gzip-~300%20KB-0ea5e9?style=flat-square)](#performance)
 
-[Dashboard](#dashboard) · [Features](#features) · [Quick start](#quick-start) · [Deploy](#deploy) · [Docs](#documentation)
+[Dashboard](#dashboard) · [Channels](#notification-channels) · [D1 usage](#cloudflare-d1-usage) · [Quick start](#quick-start) · [Deploy](#deploy) · [Docs](#documentation)
 
 </div>
 
@@ -175,6 +177,33 @@ Isi wajah se:
 - **Session token ka hash** store hota hai, token nahi — lookup chhota rehta hai.
 
 Total cold payload ~300 KB gzip.
+
+---
+
+## Platform limits
+
+Ye numbers Cloudflare ke apne docs se hain (updated 8 October 2026), aur inhe
+assume nahi kiya gaya — har limit ke saath ye hai ki PulsePost kahan rehta hai:
+
+| Limit | Free plan | PulsePost |
+|---|---|---|
+| CPU / request | 10 ms | Worker + cron dono |
+| Subrequests / invocation | 50 | Checks bounded, concurrency capped at 6 |
+| **Simultaneous connections** | **6** | `MAX_CONCURRENT_CHECKS = 6` |
+| Requests / day | 100,000 | Polling pauses when the tab is hidden |
+| D1 rows read / day | 5,000,000 | See [D1 usage](#cloudflare-d1-usage) |
+| D1 rows written / day | 100,000 | ~5,760 at 20 monitors |
+
+**Do jagah pehle limit ke kareeb tha:**
+
+- **Subrequests.** Checks pehle `Promise.allSettled` se **poore parallel** chalte
+  the — 20 checks + har down monitor ke notifications easily 50 cross kar dete,
+  aur invocation sweep ke beech me maar diya jata. Ab concurrency **6** pe
+  capped hai, jo platform ke connection ceiling ka hi number hai.
+- **Requests.** Timer hidden tab me bhi chalta rehta tha. Raat bhar khuli
+  dashboard ≈ 1,200 requests aur ≈ 1.2M rows read, kisi ko dikhaye bina.
+  Ab `usePolling` visibility pe suspend karta hai, aur wapas aate hi turant
+  catch-up karta hai.
 
 ---
 

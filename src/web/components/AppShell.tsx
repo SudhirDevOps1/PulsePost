@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 
 import { api, ApiError } from '../api.ts';
 import type { Overview } from '../types.ts';
 import { Button, StatusDot, statusColor, statusLabel } from './ui.tsx';
 import { ThemeToggle } from './ThemeToggle.tsx';
+import { usePolling } from '../hooks/usePolling.ts';
 
 /**
  * Authenticated app shell: header, nav, live status pill, and the routed view.
@@ -21,27 +22,32 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      try {
-        const { overview: next } = await api.overview();
-        if (!cancelled) setOverview(next);
-      } catch {
-        // A failed poll must not blank the dashboard; keep the last good value
-        // and let the next tick recover.
-      }
-    };
-
-    void load();
-    const timer = setInterval(load, POLL_MS);
-
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
+  /**
+   * One fetch, shared by the initial paint and the poll.
+   *
+   * Declared with `useCallback` so it has a stable identity: `usePolling` holds
+   * the callback in a ref precisely so it can be an inline arrow, and hoisting it
+   * out of the effect is what lets both the first load and the interval use the
+   * same function instead of two copies that could drift.
+   */
+  const load = useCallback(async () => {
+    try {
+      const { overview: next } = await api.overview();
+      setOverview(next);
+    } catch {
+      // A failed poll must not blank the dashboard; keep the last good value
+      // and let the next tick recover.
+    }
   }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  // The status pill renders on every page, so this is the most frequently
+  // triggered poll in the app. `usePolling` suspends it while the tab is hidden
+  // rather than quietly spending the free allowance overnight.
+  usePolling(load, POLL_MS);
 
   const overall = overallStatus(overview);
 
@@ -152,7 +158,62 @@ export function AppShell({ onSignOut }: { onSignOut: () => void }) {
       <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
         <Outlet />
       </main>
+
+      <Footer />
     </div>
+  );
+}
+
+/**
+ * Where the code is, and who wrote it.
+ *
+ * An open-source project that is deployed under someone else's `workers.dev`
+ * should say so on the running product, not only in the repository. This is the
+ * only surface every authenticated user is guaranteed to see, and it is what
+ * makes the licence and the source reachable from a deployment that has no
+ * other link back.
+ */
+function Footer() {
+  return (
+    <footer className="mt-4 border-t border-[var(--color-border-subtle)] px-4 py-6 sm:px-6">
+      <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-3 text-xs text-[var(--color-text-tertiary)] sm:flex-row sm:items-center">
+        <p>
+          <span className="font-bold text-[var(--color-text-secondary)]">PulsePost</span>
+          {' — '}self-hosted uptime monitoring on Cloudflare Workers.{' '}
+          <span className="ml-1">MIT licensed.</span>
+        </p>
+
+        <nav aria-label="Project links" className="flex items-center gap-4">
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="pressable inline-flex items-center gap-1.5 font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-accent-text)]"
+          >
+            <GitHubIcon />
+            Source
+          </a>
+          <a
+            href={`${REPO_URL}/issues`}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="pressable font-semibold text-[var(--color-text-secondary)] hover:text-[var(--color-accent-text)]"
+          >
+            Report an issue
+          </a>
+        </nav>
+      </div>
+    </footer>
+  );
+}
+
+const REPO_URL = 'https://github.com/SudhirDevOps1/PulsePost';
+
+function GitHubIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
   );
 }
 

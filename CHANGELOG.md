@@ -1,5 +1,55 @@
 ## [Unreleased]
 
+### Fixed
+
+- **Monitor checks ran fully in parallel.** `Promise.allSettled` started every
+  check in the slice at once. Two documented platform limits make that wrong
+  rather than merely wasteful: Workers opens only **six** simultaneous
+  connections per invocation, so the seventh request queues and the timing stops
+  being ours to reason about; and the fifty-subrequest budget is one per check
+  plus one per notification channel per transitioned monitor, so twenty monitors
+  failing together with three channels each passed straight through the budget
+  and the invocation was killed mid-sweep. Concurrency is now capped at six --
+  the platform's own number -- by a small lane scheduler that preserves result
+  order.
+
+- **Polling ran in hidden tabs.** The app shell's status pill, the dashboard and
+  the public status page each ran a `setInterval` unconditionally. A dashboard
+  left open overnight in a background tab cost roughly 1,200 requests and 1.2M
+  rows read against a 100,000 request and 5M row daily allowance, for a page
+  nobody looked at. All three now go through `usePolling`, which holds no timer
+  at all while `document.visibilityState` is hidden and catches up immediately
+  on return, so coming back to a stale tab shows current numbers instead of
+  waiting a full interval.
+
+### Changed
+
+- **The brand mark matches the product.** The favicon and the web manifest still
+  carried the pre-clay palette -- a near-black tile and a mint green that no
+  longer appear anywhere in the app -- so the tab icon and the running product
+  disagreed. Both now use the brand lilac and green, and the manifest's
+  background and theme colours are the current clay surface and accent. The
+  favicon also declares a maskable icon and an `id`, which the manifest already
+  implied but did not specify.
+
+- **The running product links back to its source.** A footer on every
+  authenticated page carries the project name, the MIT licence, a link to the
+  repository and one to the issue tracker. An MIT deployment sitting on someone
+  else's `workers.dev` should make both reachable without a separate trip to
+  GitHub.
+
+- README carries the brand mark, a platform-limits section with what each
+  ceiling is actually costing, and the corrected database count.
+
+### Verified
+
+- 182/182 tests, typecheck clean. Confirmed live: footer renders with both
+  repository links carrying `rel="noreferrer noopener"`, manifest serves the new
+  palette, favicon returns 200.
+
+
+## [Unreleased]
+
 ### Added
 
 - **Ten notification transports**, taking the total to thirteen. Telegram, ntfy,

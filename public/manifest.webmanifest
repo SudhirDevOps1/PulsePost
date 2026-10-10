@@ -1,19 +1,27 @@
 {
   "name": "PulsePost",
   "short_name": "PulsePost",
-  "description": "Self-hosted uptime monitoring on Cloudflare's edge.",
+  "description": "Self-hosted uptime and status-page monitoring on Cloudflare Workers. Open source, MIT licensed.",
+  "id": "/",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#06090f",
-  "theme_color": "#06090f",
+  "background_color": "#e8edf7",
+  "theme_color": "#7565db",
+  "categories": ["productivity", "developer", "utilities"],
   "icons": [
     {
       "src": "/favicon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }

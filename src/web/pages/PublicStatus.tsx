@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import { api, ApiError } from '../api.ts';
 import type { PublicStatus } from '../types.ts';
 import { UptimeBars } from '../components/UptimeBars.tsx';
+import { usePolling } from '../hooks/usePolling.ts';
 import {
   Badge,
   ErrorNote,
@@ -73,9 +74,11 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
 
   useEffect(() => {
     void load();
-    const timer = setInterval(() => void load(), 60_000);
-    return () => clearInterval(timer);
   }, [load]);
+
+  // Public pages are the most likely to be left open, so this one pauses
+  // hardest: no timer at all while the tab is hidden.
+  usePolling(load, 60_000);
 
   if (loading) return <StatusSkeleton />;
   if (error) return <div className="p-6"><ErrorNote message={error} /></div>;

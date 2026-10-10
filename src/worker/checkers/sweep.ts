@@ -16,6 +16,15 @@ import { runCheck, type CheckableMonitor } from '../checkers/engine.ts';
 import { broadcast, type Channel, type NotificationEvent } from '../notifications/send.ts';
 
 /**
+ * How many monitor checks may be in flight at once.
+ *
+ * Six is the platform's own ceiling on simultaneous open connections per
+ * invocation, and it is unchanged between the free and paid plans. Matching it
+ * means the sweep never queues behind itself.
+ */
+const MAX_CONCURRENT_CHECKS = 6;
+
+/**
  * The scheduled sweep — the heart of the product.
  *
  * Runs once a minute from `export default { scheduled }`. Three jobs:
@@ -80,10 +89,55 @@ export async function runSweep(
     return result;
   }
 
-  // Checks run concurrently but are awaited together, so the whole slice
-  // completes within one invocation's wall-clock budget.
-  const settled = await Promise.allSettled(
-    monitors.map((monitor) => checkOne(db, monitor, options)),
+  /**
+ * Run at most `limit` tasks at a time, preserving result order.
+ *
+ * Why this exists
+ * --------------
+ * The obvious version of this was `Promise.allSettled(monitors.map(checkOne))`,
+ * which starts every check in the slice simultaneously. Two documented platform
+ * limits make that wrong rather than merely wasteful:
+ *
+ *   - **Six simultaneous open connections per invocation.** A seventh `fetch()`
+ *     does not fail; it queues until one of the first six returns headers. The
+ *     work still happens, but the timing becomes the runtime's decision instead
+ *     of ours.
+ *   - **Fifty subrequests per invocation.** Each check is one. Notifications are
+ *     more, one per channel per transitioned monitor, so a slice of twenty
+ *     monitors that fail together with three channels each blows straight
+ *     through the budget and the invocation is killed mid-sweep.
+ *
+ * Six is the connection ceiling, so it is also the natural width here: enough
+ * to overlap network latency, small enough that nothing queues behind us.
+ */
+async function withConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  worker: (item: T) => Promise<R>,
+): Promise<PromiseSettledResult<R>[]> {
+  const results = new Array<PromiseSettledResult<R>>(items.length);
+  let next = 0;
+
+  const runLane = async (): Promise<void> => {
+    for (;;) {
+      const index = next++;
+      if (index >= items.length) return;
+      try {
+        results[index] = { status: 'fulfilled', value: await worker(items[index]!) };
+      } catch (reason) {
+        results[index] = { status: 'rejected', reason };
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runLane));
+  return results;
+}
+
+// Checks overlap so network latency is not paid twenty times over, but never
+  // more than the platform will open at once.
+  const settled = await withConcurrency(monitors, MAX_CONCURRENT_CHECKS, (monitor) =>
+    checkOne(db, monitor, options),
   );
 
   const toInsert: NewCheck[] = [];

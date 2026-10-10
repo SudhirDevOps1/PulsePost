@@ -62,3 +62,7 @@ Thumbs.db
 # Reference clone (analysis only)
 # ---------------------------------------------------------------------------
 _reference_pingflare/
+# Local dev-server log. pnpm dev writes to stdout; only the helper that starts it
+# detached redirects to a file. Tracked by accident once because the file is
+# created while the process runs, after a gitignore-aware ignore was assumed.
+dev.log

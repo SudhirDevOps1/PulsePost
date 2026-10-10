@@ -337,6 +337,21 @@ export const inputClass =
 export const selectClass = `${inputClass} appearance-none bg-[url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%2256648a%22 stroke-width=%222.5%22 stroke-linecap=%22round%22><path d=%22M6 9l6 6 6-6%22/></svg>')] bg-[length:18px] bg-[right_0.9rem_center] bg-no-repeat pr-11`;
 
 /**
+ * A `select` that sizes to its widest option instead of filling its row.
+ *
+ * `selectClass` carries `w-full`, which is right for a field inside a `<Field>`.
+ * In a filter toolbar it is wrong, and the obvious override does not work:
+ * appending `w-auto` adds a second single-class width utility, so which one
+ * applies is decided by the order Tailwind happens to emit them in — not by the
+ * order they were written. The loser is not reliably `w-auto`.
+ *
+ * Rather than fight specificity, this variant omits `w-full` entirely. With no
+ * declared width the control falls back to its intrinsic size, which is what
+ * "inline control" actually means, and it cannot be overridden by accident.
+ */
+export const inlineSelectClass = selectClass.replace('w-full ', '');
+
+/**
  * Uptime percentage.
  *
  * Colour thresholds are intentionally harsh: 99.9% still renders as a warning

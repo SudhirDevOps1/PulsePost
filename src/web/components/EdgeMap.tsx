@@ -76,7 +76,13 @@ export function EdgeMap({ nodes, height = 340 }: { nodes: EdgeNode[]; height?: n
     return (
       <div
         className="clay-inset grid place-items-center px-6 text-center"
-        style={{ height, borderRadius: 'var(--radius-tile)' }}
+        // Reserved height, not required height. Holding the full map height for
+        // an empty state reserved 340px of nothing above the fold on every
+        // fresh instance -- the first hour of anyone's experience -- while
+        // explaining a third of the dashboard's area. The message needs a
+        // moment of attention, not a quarter of the screen; the full height
+        // comes back the moment there is a map to hold.
+        style={{ height: Math.min(height, 168), borderRadius: 'var(--radius-tile)' }}
       >
         <div>
           <p className="text-sm font-medium text-[var(--color-text-primary)]">No edge nodes yet</p>

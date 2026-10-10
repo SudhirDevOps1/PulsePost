@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/context.ts';
 import type { AppEnv } from '../middleware/context.ts';
 import { apiRateLimit } from '../middleware/ratelimit.ts';
 import { nowIso } from '../db/dialect.ts';
+import type { DatabaseAdapter } from '../db/types.ts';
 import * as repo from '../repository/monitors.ts';
 import { runCheck } from '../checkers/engine.ts';
 import { validateUrl, DEFAULT_POLICY, SsrfError } from '../checkers/ssrf.ts';
@@ -31,6 +32,34 @@ import type { EdgeNode, Monitor } from '../../shared/types.ts';
  */
 
 export const monitorRoutes = new Hono<AppEnv>();
+
+/**
+ * Mean response time across every check in the last 24 hours.
+ *
+ * The obvious implementation — averaging each monitor's `avg_response_time_ms`
+ * — reads from `daily_status`, which is a *rollup* the nightly job writes. On a
+ * fresh instance that table is empty until the first night, so the dashboard's
+ * "Avg latency" tile rendered a bare em-dash for up to 24 hours after setup,
+ * next to a monitor card that was showing a real number from the same checks.
+ * Two sources disagreeing on the same measurement is worse than either being
+ * blank.
+ *
+ * Raw `checks` rows exist the moment the first sweep lands, and the 7-day
+ * retention comfortably covers a 24-hour window. `idx_checks_time` serves this
+ * as a range scan, and it costs one indexed query rather than the rollup read
+ * it replaces.
+ */
+async function averageLatency24h(db: DatabaseAdapter): Promise<number | null> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const row = await db.query<{ avg: number | null }>(
+    `SELECT AVG(response_time_ms) AS avg
+       FROM checks
+      WHERE checked_at >= ?1 AND response_time_ms IS NOT NULL`,
+    [cutoff],
+  );
+  const avg = row.rows[0]?.avg;
+  return avg === null || avg === undefined ? null : Math.round(Number(avg));
+}
 
 monitorRoutes.use('*', apiRateLimit(), requireAuth('viewer'));
 
@@ -82,9 +111,7 @@ monitorRoutes.get('/overview', async (c) => {
   const weighted90d = average(
     monitors.map((monitor) => monitor.uptime_90d),
   );
-  const avgLatency = average(
-    monitors.map((monitor) => monitor.avg_response_time_ms),
-  );
+  const avgLatency = await averageLatency24h(db);
 
   const incidents = await db.query<{ n: number }>(
     `SELECT COUNT(*) AS n FROM incidents WHERE status <> 'resolved'`,

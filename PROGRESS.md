@@ -1,5 +1,7 @@
 # PROGRESS
 
+> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
 Dense changelog of completed work. No markdown formatting beyond bullets.
 
 ## Phase 1 — Analysis & architecture

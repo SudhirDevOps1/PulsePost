@@ -65,7 +65,16 @@ export function LatencyChart({
           so it cannot be overlapped by Recharts' SVG. */}
       <div style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={points} margin={{ top: 6, right: 6, bottom: 0, left: -18 }}>
+          {/*
+  `left: 0`, not a negative value.
+
+  A negative left margin pulls the axis out past the edge of the SVG, so
+  Recharts still reserves `YAxis width` for it but roughly half of that space
+  falls outside the clip region. The result was axis labels with their leading
+  digit sheared off -- "136ms" rendered as "36ms". The labels need that width
+  *inside* the chart, which means claiming it rather than saving it.
+*/}
+      <AreaChart data={points} margin={{ top: 6, right: 6, bottom: 0, left: 0 }}>
           <defs>
             {/* Gradient keyed to the chart's own accent so it follows theming. */}
             <linearGradient id="latencyFill" x1="0" y1="0" x2="0" y2="1">

@@ -161,10 +161,20 @@ export function Dashboard() {
     <div className="space-y-5">
       {error ? <ErrorNote message={error} onRetry={load} /> : null}
 
-      {/* --- headline --- */}
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+      {/*
+        --- headline ---
+
+        Six columns, not five. `Overall` spans two because it is the only tile
+        that answers "is anything wrong" — the rest are supporting numbers. With
+        five even columns the five cards could not both give `Overall` double
+        width and divide evenly, so below `lg` the layout fell back to two
+        columns and left the last card stranded alone on its own row, full
+        width. Six fixes both cases: `Overall` full-width on mobile, then a
+        clean 2x2; one even row of five across on desktop.
+      */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         <StatCard
-          className="min-w-0"
+          className="col-span-2 min-w-0"
           label="Overall"
           value={overview ? statusWord(overview) : '—'}
           tone={
@@ -193,13 +203,14 @@ export function Dashboard() {
           value={formatMs(overview?.avg_response_time_ms ?? null)}
           tone="accent"
           hint="24 hour mean"
+          className="min-w-0"
         />
         <StatCard
           label="Incidents"
           value={overview?.active_incidents ?? 0}
           tone={overview && overview.active_incidents > 0 ? 'degraded' : 'neutral'}
           hint={`swept ${timeAgo(overview?.last_sweep_at)}`}
-          className="col-span-2 lg:col-span-1"
+          className="min-w-0"
         />
       </section>
 
@@ -261,34 +272,50 @@ export function Dashboard() {
         {/* Search and sort. Both run server-side, so they work the same whether
             the list holds five monitors or two hundred. */}
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <input
-            className={`${inputClass} max-w-56`}
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or URL"
-            aria-label="Search monitors"
-          />
+          {/*
+            The width lives on a wrapper, not on the control.
 
-          <select
-            className={`${selectClass} w-auto`}
-            value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-            aria-label="Sort monitors by"
-          >
-            <option value="created_at">Newest first</option>
-            <option value="name">Name A–Z</option>
-            <option value="updated_at">Recently changed</option>
-          </select>
+            `inputClass` sets `w-full`, and appending `w-auto` does not beat it:
+            both are single-class width utilities, so the winner is whichever one
+            Tailwind emits later -- not whichever one was written last. The select
+            rendered full-width regardless. Sizing a shrink-to-fit wrapper lets
+            the control's own `w-full` resolve against *its content* instead of
+            the whole row, which is what "inline control" actually means.
+          */}
+          <div className="w-full sm:w-56">
+            <input
+              className={inputClass}
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or URL"
+              aria-label="Search monitors"
+            />
+          </div>
 
-          <Button
-            size="sm"
-            onClick={() => setOrder((current) => (current === 'asc' ? 'desc' : 'asc'))}
-            aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
-            title={order === 'asc' ? 'Ascending' : 'Descending'}
-          >
-            {order === 'asc' ? '↑' : '↓'}
-          </Button>
+          {/* Sort and its direction belong together -- the arrow was landing on
+              its own line below a full-width select, reading as a stray glyph. */}
+          <div className="flex items-center gap-2">
+            <select
+              className={selectClass}
+              value={sort}
+              onChange={(e) => setSort(e.target.value as typeof sort)}
+              aria-label="Sort monitors by"
+            >
+              <option value="created_at">Newest first</option>
+              <option value="name">Name A–Z</option>
+              <option value="updated_at">Recently changed</option>
+            </select>
+
+            <Button
+              size="sm"
+              onClick={() => setOrder((current) => (current === 'asc' ? 'desc' : 'asc'))}
+              aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
+              title={order === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {order === 'asc' ? '↑' : '↓'}
+            </Button>
+          </div>
 
           {search || sort !== 'created_at' || order !== 'desc' ? (
             <Button

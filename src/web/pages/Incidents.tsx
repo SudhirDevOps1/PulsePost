@@ -11,6 +11,7 @@ import {
   Panel,
   Skeleton,
   inputClass,
+  inlineSelectClass,
   selectClass,
   timeAgo,
 } from '../components/ui.tsx';
@@ -274,7 +275,7 @@ export function IncidentsPage() {
 
         {groups.length > 0 ? (
           <select
-            className={`${selectClass} w-auto`}
+            className={inlineSelectClass}
             value={groupFilter}
             onChange={(e) => setGroupFilter(e.target.value)}
             aria-label="Filter by group"

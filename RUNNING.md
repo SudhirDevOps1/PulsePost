@@ -1,5 +1,7 @@
 # RUNNING & TESTING (Hinglish guide)
 
+> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
 Yeh file batati hai ki project ko **locally kaise chalana hai**, **test kaise karna hai**,
 aur — sabse important — **bina internet ke kaise chalana hai**.
 

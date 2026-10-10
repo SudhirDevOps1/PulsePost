@@ -1,5 +1,7 @@
 # ANALYSIS.md — PulsePost Phase 1: Deep Analysis & Real-Time Web Research
 
+> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
 > **Phase 1 deliverable.** Ye file padhne ke baad hi code me haath daalna chahiye.
 > Research date: **9 October 2026**. Saare Cloudflare numbers official docs se
 > verify kiye gaye hain (links neeche diye hain) — speculation nahi.

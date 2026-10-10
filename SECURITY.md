@@ -1,5 +1,7 @@
 # Security
 
+> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+
 PulsePost khud ko internet par expose karta hai — wo iska kaam hai. Is liye
 security assumptions yahan likhi hain taaki aap jaan sakein kya kya guard hai,
 kya kya nahi, aur apna instance kaise harden karein.

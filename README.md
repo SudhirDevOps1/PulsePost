@@ -1,14 +1,45 @@
+<div align="center">
+
 # PulsePost
 
 **Ek Cloudflare Worker. Poora uptime monitor. Paanch database. Zero vendor lock-in.**
 
-PulsePost ek self-hosted uptime aur status-page monitor hai jismein frontend aur
-backend ek hi Cloudflare Worker mein rehte hain — koi alag API host nahi, koi
-alag frontend deploy nahi. Poora project free tier pe chalta hai aur database
-ek env var badalne se kisi bhi doosre provider pe shift ho jaata hai.
+[![tests](https://img.shields.io/badge/tests-157%20passing-16a34a?style=flat-square)](#)
+[![workers](https://img.shields.io/badge/Cloudflare-Workers-orange?style=flat-square)](https://workers.cloudflare.com)
+[![d1](https://img.shields.io/badge/database-6%20providers-7c6be8?style=flat-square)](#database-provider-badlo)
+[![license](https://img.shields.io/badge/license-MIT-14b8a6?style=flat-square)](#license)
+[![bundle](https://img.shields.io/badge/gzip-~300%20KB-0ea5e9?style=flat-square)](#performance)
 
-> **Demo credentials (local dev):** `demo@pulsepost.local` / `demo-Instance-2026!`
-> — sirf local instance pe. Production pe inhe turant change kar do.
+[Dashboard](#dashboard) · [Features](#features) · [Quick start](#quick-start) · [Deploy](#deploy) · [Docs](#documentation)
+
+</div>
+
+PulsePost ek self-hosted uptime aur status-page monitor hai jismein **frontend aur
+backend ek hi Cloudflare Worker** mein rehte hain — koi alag API host nahi, koi alag
+frontend deploy nahi, koi CDN bucket manage nahi karna. Poora project free tier pe
+chalta hai, aur database ek env var badalne se kisi bhi doosre provider pe shift ho
+jaata hai.
+
+<p align="center">
+  <img src="docs/images/dashboard-light.png" alt="PulsePost dashboard — uptime tiles, Cloudflare edge map, latency chart and monitor list" width="100%">
+</p>
+
+---
+
+## Dashboard
+
+<p align="center">
+  <img src="docs/images/dashboard-dark.png" alt="PulsePost dashboard in the dark clay theme" width="49%">
+  <img src="docs/images/monitors-light.png" alt="Monitor list with inline pause, rename and delete, search and sort" width="49%">
+</p>
+
+<p align="center">
+  <img src="docs/images/incidents-light.png" alt="Incident timeline with status progression" width="32%">
+  <img src="docs/images/channels-light.png" alt="Alert channels showing write-only webhook URLs" width="33%">
+  <img src="docs/images/status-light.png" alt="Public status page, no login required" width="32%">
+</p>
+
+Poore gallery: [`docs/images/`](docs/images/) — har page light aur dark dono me.
 
 ---
 
@@ -22,6 +53,90 @@ ek env var badalne se kisi bhi doosre provider pe shift ho jaata hai.
 | **Telemetry** | Koi nahi. Koi bhi data bahar nahi jaata |
 | **Cold start** | Hono + Workers native, ~300 KB gzip |
 | **License** | MIT — apne hisaab se self-host karo |
+
+---
+
+## Features
+
+**Monitoring**
+- HTTP monitor — koi bhi method, headers, body, expected status range
+- Multi-step DSL — `login → token → authenticated call`, 11 assertion operators
+- Per-monitor thresholds: latency warn/fail, downtime threshold before alerting
+- Cron sweep — least-recently-checked fairness, retries, alert deduplication
+- Multi-colo execution — `CHECK_COLOS` se Cloudflare se kai edge locations se check
+
+**Dashboard**
+- Live edge map (Leaflet) — har check kis Cloudflare colo se aaya
+- Latency charts (Recharts), 90-day uptime bars, per-group rollups
+- Server-side search, sort, pagination — list chhoti ho ya badi, same code
+- Public status pages — per-group slug se, koi login nahi chahiye
+- Light (clay) + dark themes, fully responsive, code-split
+
+**Operations**
+- Incidents — timeline updates, auto `resolved_at` derivation
+- Notification channels — Slack, Discord, generic webhook (HMAC-signed option)
+- Multi-user — admin / editor / viewer roles, TOTP 2FA, PBKDF2 passwords
+- Audit log — har destructive action record hota hai
+
+**Security**
+- SSRF guard — private/loopback/link-local/CGNAT block, DNS re-resolution, redirect revalidation
+- CSP (`script-src 'self'`), HSTS, rate limiting, Zod validation, CORS, IP allowlist
+- Webhook URLs **write-only** — store hote hain, kabhi return nahi hote
+- Session tokens ke **hash** store hote hain — DB leak se cookie usable nahi banta
+
+---
+
+## Quick start
+
+```bash
+git clone https://github.com/SudhirDevOps1/PulsePost.git
+cd PulsePost
+pnpm install
+cp wrangler.toml.example wrangler.toml     # DB_PROVIDER = "d1" rakho
+pnpm dev                                  # http://127.0.0.1:8787
+```
+
+Pehli baar chalate waqt koi admin account nahi hota. Browser me kholo aur
+**onboarding screen** pe pehla admin bana do — uske baad `/api/auth/setup` band
+ho jaata hai (409).
+
+Demo data dekhna hai? Dashboard khaali table pe charts, uptime bars aur edge map
+sab bekaar dikhte hain:
+
+```bash
+node scripts/seed-demo.mjs http://127.0.0.1:8787
+# demo@pulsepost.local / demo-Instance-2026!   ← sirf local instance
+```
+
+### Offline install
+
+Poori tarah bina internet ke chal sakta hai — pnpm store project ke andar vendored hai:
+
+```bash
+pnpm offline:install    # --offline --frozen-lockfile
+pnpm offline:check      # verify karta hai ki kya kya missing hai
+```
+
+Details [`RUNNING.md`](RUNNING.md) me.
+
+---
+
+## Deploy
+
+Cloudflare pe live karne ke liye domain ki zaroorat nahi — `*.workers.dev` free milta
+hai, aur credit card bhi nahi. Poora procedure [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+me hai (D1 create → `wrangler secret put` → deploy → pehla admin banao).
+
+<details>
+<summary>Sabse chhoti command</summary>
+
+```bash
+pnpm exec wrangler d1 create pulsepost-db      # database_id wrangler.toml me daalo
+pnpm exec wrangler secret put CRON_SECRET      # node -e "console.log(crypto.randomUUID()+crypto.randomUUID())"
+pnpm deploy
+```
+
+</details>
 
 ---
 
@@ -41,62 +156,45 @@ code same rehta hai:
 
 Schema ek hi file hai — `migrations/0001_init.sql` — jo SQLite aur Postgres
 dono pe bina badle chalti hai. Placeholder rewriting aur boolean handling
-`src/worker/db/dialect.ts` mein hai.
+`src/worker/db/dialect.ts` me hai.
 
 ---
 
-## Features
+## Performance
 
-**Monitoring**
-- HTTP monitor — koi bhi method, headers, body, expected status range
-- Multi-step DSL — `login → token → authenticated call`, 11 assertion operators
-- 11 assertion types: status, body contains, JSON path, regex, latency, headers
-- Cron sweep — least-recently-checked fairness, retries, alert deduplication
-- Per-monitor thresholds: latency warn/fail, downtime threshold before alerting
+Cloudflare Workers free tier ki **sabse sakht limit 10 ms CPU per request** hai.
+Isi wajah se:
 
-**Dashboard**
-- Live edge map (Leaflet) — har check ka Cloudflare colo
-- Latency charts (Recharts), 90-day uptime bars, per-group rollups
-- Public status pages — per-group slug se, koi login nahi chahiye
-- Dark/light, responsive, code-split (Leaflet aur Recharts lazy load hote hain)
+- **Charts aur map lazy-load** hote hain — Recharts ~82 KB aur Leaflet ~45 KB
+  gzip, dono first paint se baad me.
+- **`daily_status` rollups** — 90/365-day uptime ek table se, ~365 rows ke bajaye
+  ~525,600. `include_uptime=1` opt-in hai, warna har list request me 90 numbers ×
+  har monitor bajate.
+- **`CHECKS_PER_RUN = 20`** — 50 subrequest cap ke andar notification calls ke
+  liye headroom chhodkar.
+- **Session token ka hash** store hota hai, token nahi — lookup chhota rehta hai.
 
-**Operations**
-- Incidents — timeline updates, auto `resolved_at` derivation
-- Notification channels — webhook / Slack / Discord, per-monitor policy
-- Multi-user — admin / editor / viewer roles, TOTP 2FA, PBKDF2 passwords
-- Audit log — har destructive action record hota hai
-
-**Security**
-- SSRF guard — private/loopback/link-local/CGNAT block, DNS re-resolution, redirect revalidation
-- CSP (`script-src 'self'`), HSTS, rate limiting, Zod validation, CORS, IP allowlist
-- Webhook URLs write-only — store hote hain, kabhi return nahi hote
-- Session tokens ke hash store hote hain — DB leak se cookie usable nahi banta
+Total cold payload ~300 KB gzip.
 
 ---
 
-## Quick start
+## Architecture
 
-```bash
-git clone https://github.com/SudhirDevOps1/PulsePost.git
-cd PulsePost
-pnpm install
-pnpm verify        # types + tests
-pnpm dev           # http://127.0.0.1:8787
+```
+src/
+├── worker/           # Backend — ek Hono app
+│   ├── routes/       # monitors, groups, incidents, channels, users, auth, status
+│   ├── db/           # 6-provider adapter + portable SQL dialect
+│   ├── checkers/     # HTTP + DSL engine, SSRF guard, cron sweep
+│   ├── notifications/# Slack / Discord / webhook payload builders
+│   ├── auth/         # PBKDF2, TOTP, sessions
+│   └── middleware/   # security headers, CORS, rate limit, identity
+├── shared/           # Types + Zod schemas (dono taraf share hote hain)
+└── web/              # React + Vite SPA
 ```
 
-Pehli baar chalate waqt `wrangler.toml.example` ko `wrangler.toml` mein copy karo
-aur browser pe `/setup` pe jaake admin account banao.
-
-### Offline install
-
-Poori tarah bina internet ke chal sakta hai — pnpm store project ke andar vendored hai:
-
-```bash
-pnpm offline:install    # --offline --frozen-lockfile
-pnpm offline:check      # verify karta hai ki kya kya missing hai
-```
-
-Details ke liye [`RUNNING.md`](RUNNING.md) dekho.
+Database abstraction `src/worker/db/types.ts` me ek interface hai. Naya provider
+add karna hai to ek adapter likho, baaki code untouched rehta hai.
 
 ---
 
@@ -107,30 +205,13 @@ Details ke liye [`RUNNING.md`](RUNNING.md) dekho.
 | `pnpm dev` | Build + local Worker |
 | `pnpm build` | Production build |
 | `pnpm deploy` | Cloudflare pe deploy |
-| `pnpm test` | Test suite |
+| `pnpm test` | Test suite (157 tests) |
 | `pnpm typecheck` | `tsc --noEmit` |
-| `pnpm verify` | Sab kuch — build, types, tests |
+| `pnpm verify` | Sab kuch — imports, types, tests |
 | `pnpm db:migrate` | Migration chalao (non-Worker DBs ke liye) |
 | `pnpm offline:prepare` | Offline store banao |
-
----
-
-## Architecture
-
-```
-src/
-├── worker/           # Backend — ek Hono app
-│   ├── routes/       # monitors, groups, incidents, channels, users, auth
-│   ├── db/           # 6-provider adapter + portable SQL dialect
-│   ├── checkers/     # HTTP + DSL engine, SSRF guard, cron sweep
-│   ├── auth/         # PBKDF2, TOTP, sessions
-│   └── middleware/   # security headers, CORS, rate limit, identity
-├── shared/           # Types + Zod schemas ( dono taraf share hote hain )
-└── web/              # React + Vite SPA
-```
-
-Database abstraction `src/worker/db/types.ts` mein ek interface hai. Naya provider
-add karna hai to ek adapter likho, baaki code untouched rehta hai.
+| `node scripts/seed-demo.mjs` | Local demo data bharo |
+| `node scripts/shoot.mjs` | Docs screenshots regenerate karo |
 
 ---
 
@@ -138,22 +219,31 @@ add karna hai to ek adapter likho, baaki code untouched rehta hai.
 
 | File | Kya hai |
 |---|---|
-| [`RUNNING.md`](RUNNING.md) | Local setup, offline install, troubleshooting |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Cloudflare + doosre providers pe deploy, step by step |
+| [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Har env var, har secret, default value ke saath |
+| [`docs/API.md`](docs/API.md) | Saare 36 REST endpoints, auth ke saath |
+| [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Local setup, conventions, PR flow |
+| [`RUNNING.md`](RUNNING.md) | Troubleshooting, offline install |
 | [`ANALYSIS.md`](ANALYSIS.md) | Design decisions aur architecture rationale |
-| [`PROGRESS.md`](PROGRESS.md) | Changelog — kya bana, kya bugs mile |
+| [`SECURITY.md`](SECURITY.md) | Threat model, disclosure policy |
+| [`PROGRESS.md`](PROGRESS.md) | Kya bana, kya bugs mile |
 
 ---
 
 ## Security
 
 Koi vulnerability mili ho to report karein — public issue ke bajaye
-private channel prefer karenge. Details [`SECURITY.md`](SECURITY.md) mein.
+private channel prefer karenge. Details [`SECURITY.md`](SECURITY.md) me.
+
+> **Production pe deploy karne ke baad** pehla admin account bana do aur
+> `.dev.vars` / `wrangler.toml` kabhi commit mat karna. Dono gitignore me hain.
 
 ---
 
 ## Contributing
 
 Issues aur PR welcome hain. Chhote changes pehle `pnpm verify` chala lein.
+Details [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) me.
 
 ---
 

@@ -273,16 +273,6 @@ export async function listWithStatus(
     [...ids, since24h],
   );
 
-  const longWindowResult = await db.query<{ monitor_id: string; total: number; up: number }>(
-    `SELECT monitor_id,
-            COUNT(*) AS total,
-            SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) AS up
-       FROM checks
-      WHERE monitor_id IN (${placeholders}) AND checked_at >= ? AND status <> 'degraded'
-      GROUP BY monitor_id`,
-    [...ids, sinceWindow],
-  );
-
   // 24h from raw checks; the long window from the daily rollup table, which is
   // what keeps 90-day views at ~90 rows per monitor instead of ~130k.
   const rollupResult = await db.query<{
@@ -301,6 +291,44 @@ export async function listWithStatus(
       GROUP BY monitor_id`,
     [...ids, sinceWindow.slice(0, 10)],
   );
+
+  const rollupById = new Map(rollupResult.rows.map((r) => [String(r.monitor_id), r]));
+
+  /**
+   * 90-day uptime, preferring the daily rollup.
+   *
+   * This query used to run unconditionally against the raw `checks` table,
+   * with the rollup consulted only as a fallback when the raw scan came back
+   * empty. That is backwards. `daily_status` holds one row per monitor per day,
+   * so the entire 90-day window costs about 90 rows per monitor, while the raw
+   * scan has to walk every check ever retained for that monitor.
+   *
+   * Retention caps the raw table (7 days by default) so this was not unbounded
+   * -- but it was still a full multi-day scan on every list call, including the
+   * dashboard, which calls this function twice per page view.
+   *
+   * It now runs only for the monitors the rollup cannot answer for: a fresh
+   * instance before its first nightly job, and nothing else.
+   */
+  const missingRollup = ids.filter((id) => !rollupById.has(id));
+  const longById = new Map<string, { total: number; up: number }>();
+
+  if (missingRollup.length > 0) {
+    const longPlaceholders = missingRollup.map(() => '?').join(', ');
+    const longWindowResult = await db.query<{ monitor_id: string; total: number; up: number }>(
+      `SELECT monitor_id,
+              COUNT(*) AS total,
+              SUM(CASE WHEN status = 'up' THEN 1 ELSE 0 END) AS up
+         FROM checks
+        WHERE monitor_id IN (${longPlaceholders}) AND checked_at >= ? AND status <> 'degraded'
+        GROUP BY monitor_id`,
+      [...missingRollup, sinceWindow],
+    );
+    for (const row of longWindowResult.rows) {
+      longById.set(String(row.monitor_id), row);
+    }
+  }
+
 
   const uptime = (row: { total: number; up: number } | undefined): number | null => {
     const total = toNumOrZero(row?.total);
@@ -349,8 +377,6 @@ export async function listWithStatus(
   }
 
   const shortById = new Map(shortWindowResult.rows.map((r) => [String(r.monitor_id), r]));
-  const longById = new Map(longWindowResult.rows.map((r) => [String(r.monitor_id), r]));
-  const rollupById = new Map(rollupResult.rows.map((r) => [String(r.monitor_id), r]));
 
   let result: MonitorWithStatus[] = monitors.map((monitor) => {
     const lastCheck = latestByMonitor.get(monitor.id) ?? null;
@@ -359,7 +385,9 @@ export async function listWithStatus(
       current_status: lastCheck?.status ?? null,
       last_check: lastCheck,
       uptime_24h: uptime(shortById.get(monitor.id)),
-      uptime_90d: uptime(longById.get(monitor.id) ?? rollupById.get(monitor.id)),
+      // Rollup first. `longById` only holds monitors the rollup could not answer
+      // for, so this is a deliberate fallback rather than a preference.
+      uptime_90d: uptime(rollupById.get(monitor.id) ?? longById.get(monitor.id)),
       avg_response_time_ms: avgResponse.get(monitor.id) ?? null,
       ...(options.includeDaily ? { daily: dailyByMonitor.get(monitor.id) ?? [] } : {}),
       ...(options.includeLatency ? { latency: latencyByMonitor.get(monitor.id) ?? [] } : {}),

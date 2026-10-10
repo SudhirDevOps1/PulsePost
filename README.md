@@ -178,6 +178,58 @@ Total cold payload ~300 KB gzip.
 
 ---
 
+## Cloudflare D1 usage
+
+Poora audit [`D1-AUDIT.md`](D1-AUDIT.md) me hai. Sabse zaroori baatein:
+
+| Operation | Frequency | Rows Read/Day | Rows Written/Day |
+|---|---|---|---|
+| Monitoring checks | 5,760/day | ~5,760 | ~5,760 |
+| Dashboard loads | 100/day | ~2,400,000 | 0 |
+| Status page loads | 500/day | ~250,000 | 0 |
+| Cron cleanup | 1/day | ~5,760 | ~5,760 |
+| **TOTAL** | | **~2,500,000** | **~11,520** |
+| **Free limit** | | **5,000,000** | **100,000** |
+| **% used** | | **50%** | **12%** |
+| **Verdict** | | ⚠️ Warning | ✅ Safe |
+
+> **D1 rows read pe bill karta hai — bytes ya query count pe nahi.** Ye
+> distinction sab kuch decide karta hai. Ek wide scan jo har request pe chalta
+> hai, quota ko bina koi error dikhaye khaa deta hai.
+
+### Jo theek kiya
+
+`GET /api/monitors` har call pe 90-din ka uptime **raw `checks` table se scan**
+kar raha tha, aur `daily_status` rollup ko sirf tab dekhta tha jab raw scan khaali
+aata. Ye ulta tha — rollup ka poora purpose hi ye hai.
+
+Per dashboard load: **~1,280,000 rows → ~24,000** (53× kam).
+
+### Jo jaanbujh kar nahi kiya
+
+| Suggestion | Kyun nahi |
+|---|---|
+| `SELECT *` hatao | D1 **rows** bill karta hai. Primary-key lookup me 1 row hi padhega. Benefit sirf bandwidth ka, jo bill nahi hota |
+| KV caching | Workers KV free tier **1,000 writes/day** hai. 30s polling = 2,880 writes/day — quota turant khatam. Cache API sahi choice hai, wo Phase 5 me hai |
+| Cron `0 3 * * *` | Abhi `* * * * *` hai kyunki monitor checks bhi isi cron se chalte hain. Frequency 144× kam karne se monitoring ruk jaayegi |
+
+### Indexes
+
+**Koi naya index nahi banaya** — zaroorat nahi thi. `EXPLAIN QUERY PLAN` se
+verified: teeno hot queries already indexed hain (`idx_checks_monitor_time`
+covering index ke roop me use hota hai). D1 me har extra index har INSERT pe
+write cost badhata hai, aur `checks` me roz ~5,760 inserts hote hain.
+
+### Retention
+
+| Table | Retention | Kyun |
+|---|---|---|
+| `checks` | 7 din | 1440 rows/monitor/day — isse zyada mehnga |
+| `daily_status` | 365 din | 1 row/monitor/day, 90d bars ka source |
+| `incidents`, `audit_log` | permanent | Chhote hain, history valuable hai |
+
+---
+
 ## Architecture
 
 ```
@@ -223,6 +275,7 @@ add karna hai to ek adapter likho, baaki code untouched rehta hai.
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Har env var, har secret, default value ke saath |
 | [`docs/API.md`](docs/API.md) | Saare 36 REST endpoints, auth ke saath |
 | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Local setup, conventions, PR flow |
+| [`D1-AUDIT.md`](D1-AUDIT.md) | D1 usage audit — queries, rows read/written, optimizations |
 | [`RUNNING.md`](RUNNING.md) | Troubleshooting, offline install |
 | [`ANALYSIS.md`](ANALYSIS.md) | Design decisions aur architecture rationale |
 | [`SECURITY.md`](SECURITY.md) | Threat model, disclosure policy |

@@ -1,5 +1,60 @@
 ## [Unreleased]
 
+### Added
+
+- **The Response time panel can be pointed at any monitor.** It silently
+  auto-selected one and the only clue was a small subtitle, so with several
+  monitors configured the number on the chart belonged to nobody the reader
+  could identify, and there was no way to reach a different one. A picker in the
+  panel header lists every active monitor and pins the selection -- auto-selection
+  is now a *default*, not a policy, because silently swapping the chart every
+  time a monitor goes down makes it impossible to read a single series from,
+  which is the one thing a latency chart is for. The panel also leads with the
+  selected monitor's own current latency rather than only the fleet-wide average.
+
+- **`pnpm check:hooks`, wired into `pnpm verify`.** Fails the build when a hook
+  follows a component's first `return`. React throws "Rendered fewer hooks than
+  expected" the moment the branch flips, so a component that renders an empty
+  state until data arrives crashes on its first successful render -- invisible to
+  `tsc`, to linting, and to any test that never exercises the transition. One
+  such bug was live in the latency chart while this work was in progress.
+
+### Fixed
+
+- **The latency chart's time axis lied about spacing.** The x axis was
+  categorical, so Recharts gave every check equal width regardless of when it
+  happened: a monitor on a five-minute interval and one checking twice in five
+  minutes drew identically, and a gap in checks did not appear as a gap. The axis
+  is now temporal (`dataKey="t"`, `scale="time"`).
+
+- **Duplicate axis labels.** Points were labelled `HH:MM` unconditionally, so
+  every check inside the same minute rendered the same string -- on a
+  ninety-second window the axis read `01:18 PM` six times. Labels now scale with
+  the range: seconds under ten minutes, `HH:MM` under twelve hours, date and time
+  under two days, date beyond. Tooltips use the same tiers.
+
+- **The chart did not say what window it covered.** `avg 173ms` reads as
+  equivalent whether it covers four minutes or four days, which is the
+  difference between a blip and a regression. The stats line now carries the
+  span.
+
+- **The fleet average and the chart were unqualified.** The stat tile reads
+  `24h mean across all monitors` and the panel reads `Per-monitor latency over
+  the last 120 checks`. With several monitors the two numbers are unrelated, and
+  leaving both unqualified was the fastest way to answer "why do these
+  disagree?" wrongly.
+
+### Verified
+
+- 182/182 tests, typecheck clean, `pnpm verify` exit 0. Confirmed in the browser
+  against ten monitors: the picker switches both the chart and its headline
+  number, the selection survives a poll that would otherwise reset it to
+  auto-pick, all six axis labels are distinct, and the console is free of React
+  hook errors.
+
+
+## [Unreleased]
+
 ### Fixed
 
 - **Monitor checks ran fully in parallel.** `Promise.allSettled` started every

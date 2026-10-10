@@ -18,6 +18,7 @@ import {
   formatMs,
   formatUptime,
   inputClass,
+  inlineSelectClass,
   selectClass,
   timeAgo,
   uptimeTone,
@@ -44,6 +45,8 @@ export function Dashboard() {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  // null means "not chosen yet" - the panel auto-selects until the user overrides.
+  const [pickedMonitorId, setPickedMonitorId] = useState<string | null>(null);
   const toast = useToast();
 
   /**
@@ -57,20 +60,32 @@ export function Dashboard() {
    * different one. The panel therefore displayed one monitor's name above
    * another monitor's empty chart, with no error anywhere to explain it.
    *
+   * An explicit choice always wins. Auto-selection is a *default*, not a policy:
+   * silently swapping the chart to a different monitor every time one goes down
+   * makes the panel impossible to read a single series from, which is the one
+   * thing a latency chart is for. Once someone picks a monitor, the pick holds
+   * until they change it, or the monitor is deleted or paused.
+   *
    * Only active monitors are candidates, in this order:
-   *   1. currently down   -- the interesting one
-   *   2. has check history
-   *   3. any active monitor
+   *   1. the one that was picked
+   *   2. currently down      -- the interesting one
+   *   3. has check history
+   *   4. any active monitor
    */
+  /** Every monitor the panel is allowed to chart. Paused ones cannot be checked. */
+  const activeMonitors = useMemo(() => monitors.filter((m) => m.active), [monitors]);
+
   const focusMonitor = useMemo(() => {
     const active = monitors.filter((m) => m.active);
+    const chosen = active.find((m) => m.id === pickedMonitorId);
+    if (chosen) return chosen;
     return (
       active.find((m) => m.current_status === 'down') ??
       active.find((m) => m.last_check?.checked_at) ??
       active[0] ??
       null
     );
-  }, [monitors]);
+  }, [monitors, pickedMonitorId]);
 
   const load = useCallback(async () => {
     setError(null);
@@ -261,7 +276,12 @@ export function Dashboard() {
           label="Avg latency"
           value={formatMs(overview?.avg_response_time_ms ?? null)}
           tone="accent"
-          hint="24 hour mean"
+          // Deliberately says "across all monitors". This tile and the Response
+          // time chart measure different things -- the fleet average against one
+          // monitor's series -- and with several monitors configured the two
+          // numbers are unrelated, so leaving this unqualified was the fastest
+          // way to answer "why do these disagree?" wrongly.
+          hint="24h mean across all monitors"
           className="min-w-0"
         />
         <StatCard
@@ -294,11 +314,63 @@ export function Dashboard() {
 
         <Panel
           title="Response time"
-          subtitle={focusMonitor ? focusMonitor.name : 'no monitor selected'}
+          subtitle="Per-monitor latency over the last 120 checks"
           className="min-w-0 lg:col-span-2"
+          actions={
+            /*
+             * Which monitor the chart is about.
+             *
+             * Without this the panel silently auto-selected one and the only
+             * clue was a small subtitle. With ten monitors that is a genuine
+             * dead end: the number on the chart belonged to nobody the reader
+             * could identify, and there was no way to reach a different one.
+             *
+             * Every active monitor is listed, each carrying its own status dot,
+             * so the picker doubles as a quick "what is up right now" summary.
+             * Selecting one pins it - see the `pickedMonitorId` note above.
+             */
+            <div className="min-w-0">
+              <label htmlFor="latency-monitor" className="sr-only">
+                Monitor shown in the response time chart
+              </label>
+              <div className="w-56">
+                <select
+                  id="latency-monitor"
+                  className={inlineSelectClass}
+                  value={focusMonitor?.id ?? ''}
+                  onChange={(e) => setPickedMonitorId(e.target.value)}
+                >
+                  {activeMonitors.map((monitor) => (
+                    <option key={monitor.id} value={monitor.id}>
+                      {monitor.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          }
         >
           {focusMonitor ? (
             <>
+              {/*
+               * The headline number belongs to the chart below it. Showing the
+               * monitor's own current latency here -- rather than only the
+               * fleet-wide average in the stat tile above -- is what answers
+               * "how slow is *this* one" without making the reader infer it
+               * from the plot.
+               */}
+              <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="text-2xl font-bold tabular-nums text-[var(--color-text-primary)]">
+                  {formatMs(focusMonitor.last_check?.response_time_ms ?? null)}
+                </span>
+                <span className="text-xs font-medium text-[var(--color-text-tertiary)]">
+                  most recent check
+                  {focusMonitor.last_check?.checked_at
+                    ? ` · ${timeAgo(focusMonitor.last_check.checked_at)}`
+                    : ''}
+                </span>
+              </div>
+
               <LatencyChart checks={checks} height={190} />
               <div className="mt-3">
                 <UptimePreview daily={daily} />

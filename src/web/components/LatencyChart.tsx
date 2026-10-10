@@ -42,6 +42,19 @@ export function LatencyChart({
 }) {
   const points = useMemo(() => toPoints(checks), [checks]);
 
+  /*
+   * Both of these must be computed BEFORE the early return below.
+   *
+   * A hook that sits after a conditional return is a conditional hook: React
+   * compares hook order between renders and throws "rendered fewer hooks than
+   * expected" the moment the branch flips. It flips on exactly the transition
+   * this chart is built around -- a monitor with no history yet rendering the
+   * empty state, then its first check landing and rendering the plot -- so a
+   * fresh install would have crashed on its first successful check.
+   */
+  const span = points.length > 1 ? points[points.length - 1]!.t - points[0]!.t : 0;
+  const formatTick = useMemo(() => tickFormatter(span), [span]);
+
   const hasData = points.some((point) => point.ms !== null);
 
   if (!hasData) {
@@ -86,7 +99,11 @@ export function LatencyChart({
           <CartesianGrid stroke="var(--chart-grid)" strokeDasharray="2 4" vertical={false} />
 
           <XAxis
-            dataKey="label"
+            dataKey="t"
+            type="number"
+            scale="time"
+            domain={['dataMin', 'dataMax']}
+            tickFormatter={formatTick}
             tick={{ fill: 'var(--color-text-tertiary)', fontSize: 10 }}
             tickLine={false}
             axisLine={false}
@@ -125,7 +142,13 @@ export function LatencyChart({
       <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--color-text-tertiary)]">
         <span className="tabular">
           min {formatMs(min)} · avg{' '}
-          {formatMs(Math.round(values.reduce((a, b) => a + b, 0) / values.length))} · max {formatMs(max)}
+          {formatMs(Math.round(values.reduce((a, b) => a + b, 0) / values.length))} · max{' '}
+          {formatMs(max)}
+          {/* The window, not just the shape of the line inside it. Without this
+              the same "avg 83ms" reads as equivalent whether it covers four
+              minutes or four days, which is the difference between a blip and a
+              regression. */}
+          {points.length > 1 ? <span className="font-sans"> · {spanLabel(span)}</span> : null}
         </span>
         {title ? <span className="truncate-1">{title}</span> : null}
       </div>
@@ -157,7 +180,82 @@ function LatencyTooltip({
   );
 }
 
-/** Oldest-to-newest points with a short time axis label. */
+const HOUR = 3_600_000;
+const DAY = 24 * HOUR;
+
+/**
+ * A duration, sized to its own magnitude.
+ *
+ * `4m 20s` reads correctly and `4m 20s` for a nine-day window is a lie of
+ * omission, so the units escalate instead of truncating: below a day the two
+ * largest useful units, above a day only days.
+ */
+function spanLabel(ms: number): string {
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3_600);
+  const minutes = Math.floor((totalSeconds % 3_600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  if (minutes > 0) return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
+  return `${seconds}s`;
+}
+
+/**
+ * Axis labels, chosen to suit how much time the series actually covers.
+ *
+ * A single fixed format is wrong somewhere. Time-only labels read well over an
+ * hour but are meaningless across a week -- four different days all labelled
+ * "14:00" -- and, worse, they collide outright on a short window: over ninety
+ * seconds, `HH:MM` renders 01:18:00 and 01:18:30 as the identical string
+ * "01:18 PM", which is exactly the duplicate-label artefact this axis was
+ * rewritten to remove. Seconds are therefore not an optional refinement here,
+ * they are the only thing that distinguishes one tick from the next when the
+ * whole series fits inside a minute.
+ *
+ * Formatting to the span means the tick carries exactly as much precision as
+ * the range can justify, and no more.
+ */
+function tickFormatter(span: number): (value: number) => string {
+  // Recharts re-renders ticks on every resize, so these are built once per span
+  // change rather than once per tick.
+  if (span >= 2 * DAY) {
+    const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
+    return (value) => fmt.format(new Date(value));
+  }
+  if (span >= 12 * HOUR) {
+    const fmt = new Intl.DateTimeFormat(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return (value) => fmt.format(new Date(value));
+  }
+  if (span >= 10 * 60_000) {
+    const fmt = new Intl.DateTimeFormat(undefined, {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    return (value) => fmt.format(new Date(value));
+  }
+  const fmt = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  return (value) => fmt.format(new Date(value));
+}
+
+/**
+ * Oldest-to-newest points.
+ *
+ * `label` is the tooltip's text, and it is deliberately fuller than an axis
+ * tick: a tooltip is opened on one specific point, so it can afford to say the
+ * date outright rather than relying on neighbouring ticks for context.
+ */
 function toPoints(checks: Check[]): Point[] {
   const ordered = [...checks].sort(
     (a, b) => new Date(a.checked_at).getTime() - new Date(b.checked_at).getTime(),
@@ -167,13 +265,38 @@ function toPoints(checks: Check[]): Point[] {
   // recent window is what an operator actually looks at.
   const recent = ordered.slice(-120);
 
-  return recent.map((check) => ({
-    t: new Date(check.checked_at).getTime(),
-    label: new Date(check.checked_at).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    }),
-    ms: check.status === 'down' ? null : check.response_time_ms,
-    down: check.status === 'down',
-  }));
+  const span =
+    recent.length > 1
+      ? new Date(recent[recent.length - 1]!.checked_at).getTime() -
+        new Date(recent[0]!.checked_at).getTime()
+      : 0;
+
+  // Anything spanning a day boundary needs the date, or the tooltip says the
+  // same thing for every point in the series. Seconds earn their place at the
+  // other end, where the whole series fits inside a minute.
+  const tooltipFormat =
+    span >= 12 * HOUR
+      ? new Intl.DateTimeFormat(undefined, {
+          month: 'short',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : span >= 10 * 60_000
+        ? new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' })
+        : new Intl.DateTimeFormat(undefined, {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          });
+
+  return recent.map((check) => {
+    const at = new Date(check.checked_at);
+    return {
+      t: at.getTime(),
+      label: tooltipFormat.format(at),
+      ms: check.status === 'down' ? null : check.response_time_ms,
+      down: check.status === 'down',
+    };
+  });
 }

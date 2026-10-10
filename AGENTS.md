@@ -74,6 +74,41 @@ Wrangler takes the **next free port**. `pnpm dev` printed 8788 on a machine wher
 8787 was occupied. Read the "Ready on" line; do not hardcode 8787 in a script or
 a test.
 
+### `pnpm dev` has no hot reload, and a stale server looks like a failed fix
+
+`pnpm dev` is `gen-migrations && vite build && wrangler dev`. That is a
+**one-shot build**, then a static server. There is no HMR and no watching:
+editing `src/web/**` changes nothing until the process is restarted. The bundle
+hash is the tell -- if `index-XXXX.js` has the same name it had before your
+edit, the build did not run.
+
+Worse, a killed process can leave its server alive on a port. Two servers both
+answering `/api/health` means browser checks are hitting whichever one the
+browser already cached, which is how a verified fix appears to do nothing.
+
+```powershell
+Get-Process -Name node | ForEach-Object { $_.Kill() }
+```
+
+### A hook after an early return is gated, because `tsc` cannot see it
+
+`pnpm check:hooks` runs inside `pnpm verify` and fails when a hook follows a
+component's first `return`. React throws "Rendered fewer hooks than expected"
+the moment the branch flips, so a component that renders an empty state until
+data arrives crashes on its first successful render -- invisible to `tsc`, to
+linting, and to every test that never exercises that transition.
+
+The script was wrong three times before it was right, and **each wrong version
+passed while the bug was still in the file**:
+
+- it attributed a helper's `return` to whichever function came next;
+- it could not find the body of a function whose signature spans lines, because
+  the `}` and `{` of `}) {` cancel in the depth arithmetic;
+- it matched `return` only at the body's own statement depth, so
+  `if (!ready) { return <Skeleton />; }` was invisible to it.
+
+If you change it, re-inject the bug and confirm it fails before trusting it.
+
 ### Local test credentials
 
 - Dev admin: `local@pulsepost.local` / `LocalDev1234!x`

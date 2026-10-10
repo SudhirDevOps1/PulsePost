@@ -34,7 +34,8 @@
     "db:migrate": "node --experimental-strip-types scripts/migrate.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "verify": "node scripts/gen-migrations.mjs && node scripts/fix-imports.mjs && tsc --noEmit && node --experimental-strip-types --test tests/*.test.ts",
+    "check:hooks": "node scripts/check-hooks.mjs",
+    "verify": "node scripts/gen-migrations.mjs && node scripts/fix-imports.mjs && node scripts/check-hooks.mjs && tsc --noEmit && node --experimental-strip-types --test tests/*.test.ts",
     "offline:prepare": "pnpm fetch --store-dir .pnpm-store",
     "offline:install": "pnpm install --offline --frozen-lockfile",
     "offline:check": "node scripts/check-offline.mjs"

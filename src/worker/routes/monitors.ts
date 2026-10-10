@@ -105,12 +105,21 @@ monitorRoutes.get('/overview', async (c) => {
     else if (monitor.current_status === 'down') down += 1;
   }
 
-  const weighted24h = average(
-    monitors.map((monitor) => monitor.uptime_24h),
-  );
-  const weighted90d = average(
-    monitors.map((monitor) => monitor.uptime_90d),
-  );
+  // Weighted by *active* monitors only.
+  //
+  // A paused monitor reports `uptime_24h: 0`, because it is not being checked
+  // and therefore has no successful checks to divide by. Averaging that in
+  // punishes the instance for a monitor somebody deliberately switched off:
+  // one healthy monitor plus one paused one reported 50% uptime while the
+  // status word directly above it read "Operational". The two tiles were
+  // describing the same fleet and disagreeing.
+  //
+  // A monitor that is switched off is not evidence of downtime, so it must not
+  // enter the denominator at all. With no active monitors the result stays
+  // `null`, which the UI already renders as "—" instead of a misleading zero.
+  const uptimeBasis = active.map((monitor) => monitor.uptime_24h);
+  const weighted24h = average(uptimeBasis);
+  const weighted90d = average(active.map((monitor) => monitor.uptime_90d));
   const avgLatency = await averageLatency24h(db);
 
   const incidents = await db.query<{ n: number }>(

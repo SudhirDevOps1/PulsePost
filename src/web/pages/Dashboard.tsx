@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { api, ApiError } from '../api.ts';
@@ -45,6 +45,32 @@ export function Dashboard() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const toast = useToast();
 
+  /**
+   * Which monitor the Response time panel is about.
+   *
+   * ONE definition, deliberately. This decision used to be written twice --
+   * once when fetching history and once when rendering the heading -- and the
+   * two copies drifted. The fetch took a paused monitor (its `current_status`
+   * is frozen at whatever it was when it was switched off, so a monitor that
+   * was down when paused reads as down forever) while the heading showed a
+   * different one. The panel therefore displayed one monitor's name above
+   * another monitor's empty chart, with no error anywhere to explain it.
+   *
+   * Only active monitors are candidates, in this order:
+   *   1. currently down   -- the interesting one
+   *   2. has check history
+   *   3. any active monitor
+   */
+  const focusMonitor = useMemo(() => {
+    const active = monitors.filter((m) => m.active);
+    return (
+      active.find((m) => m.current_status === 'down') ??
+      active.find((m) => m.last_check?.checked_at) ??
+      active[0] ??
+      null
+    );
+  }, [monitors]);
+
   const load = useCallback(async () => {
     setError(null);
     try {
@@ -66,17 +92,9 @@ export function Dashboard() {
       setMonitors(monitorsResult.monitors);
       setNodes(edgeResult.nodes);
 
-      // Latency history is only meaningful for a single monitor, so it follows
-      // whichever one the operator is most likely to care about.
-      const focus =
-        monitorsResult.monitors.find((m) => m.current_status === 'down') ??
-        monitorsResult.monitors[0];
-
-      if (focus) {
-        const history = await api.monitorHistory(focus.id, { limit: 120, days: 7 });
-        setChecks(history.checks);
-        setDaily(history.daily);
-      }
+      // History is NOT fetched here. It is driven by an effect keyed on
+      // `focusMonitor.id` below, so the chart and its heading cannot disagree
+      // about which monitor they are describing.
     } catch (cause) {
       setError(cause instanceof ApiError ? cause.message : 'Could not load the dashboard');
     } finally {
@@ -152,8 +170,46 @@ export function Dashboard() {
     return monitor.current_status === filter;
   });
 
-  const focusMonitor =
-    monitors.find((m) => m.current_status === 'down') ?? monitors[0] ?? null;
+  /**
+   * Fetch the history for whichever monitor the panel is currently showing.
+   *
+   * Keyed on the focus monitor's id rather than computed inside `load()`,
+   * so there is exactly one place that decides what the panel is about. The
+   * previous version chose the monitor twice - once to fetch, once to label -
+   * and the two copies drifted: the fetch took a paused monitor while the
+   * heading named a different one, producing a chart of empty space under a
+   * perfectly healthy-looking label.
+   *
+   * `cancelled` guards the usual React trap: switching monitors quickly leaves
+   * two requests in flight, and the slower one must not overwrite the newer.
+   */
+  const focusId = focusMonitor?.id ?? null;
+  useEffect(() => {
+    if (!focusId) {
+      setChecks([]);
+      setDaily([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const history = await api.monitorHistory(focusId, { limit: 120, days: 7 });
+        if (cancelled) return;
+        setChecks(history.checks);
+        setDaily(history.daily);
+      } catch {
+        // A failed history fetch should blank the chart, not strand whatever
+        // the previous monitor left behind under the new monitor's name.
+        if (!cancelled) {
+          setChecks([]);
+          setDaily([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusId]);
 
   if (loading) return <DashboardSkeleton />;
 

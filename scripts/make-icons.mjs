@@ -65,11 +65,65 @@ function findChrome() {
 const TARGETS = [
   { size: 16, file: 'favicon-16.png' },
   { size: 32, file: 'favicon-32.png' },
+  { size: 48, file: 'favicon-48.png' },
   { size: 180, file: 'apple-touch-icon.png' },
   { size: 192, file: 'icon-192.png' },
   { size: 512, file: 'icon-512.png' },
   { size: 1024, file: 'logo.png' },
 ];
+
+/**
+ * Pack PNGs into a real .ico at /favicon.ico.
+ *
+ * Why this file has to physically exist
+ * ------------------------------------
+ * Every browser asks for /favicon.ico by convention, and so do crawlers and
+ * bookmark importers. Cloudflare's asset binding here runs with
+ * `not_found_handling = "single-page-application"` -- correctly, because
+ * client-side routes like /status/my-team must survive a hard refresh. But that
+ * setting rewrites *every* unmatched path to index.html, so /favicon.ico came
+ * back 200 `text/html` containing "<!doctype". An icon parser handed HTML either
+ * renders nothing or falls back to a generic globe, and neither is a bug the
+ * `<link rel="icon">` tags can fix, because those tags are a hint and this path
+ * is a lookup.
+ *
+ * The fix is to make the path resolve to an actual file. ICO is the format that
+ * path is named after, and it carries several sizes in one file, so a 16px tab
+ * and a 48px bookmark both come out crisp.
+ *
+ * Entries are PNG-compressed, which every browser that understands ICO has
+ * understood since IE6. The alternative is BMP-in-ICO, which is roughly four
+ * times the bytes for an identical image.
+ */
+function writeIco() {
+  const sizes = [16, 32, 48];
+  const images = sizes.map((size) => readFileSync(`public/favicon-${size}.png`));
+
+  const header = Buffer.alloc(6);
+  header.writeUInt16LE(0, 0); // reserved
+  header.writeUInt16LE(1, 2); // type: icon
+  header.writeUInt16LE(sizes.length, 4);
+
+  const directory = Buffer.alloc(16 * sizes.length);
+  let offset = header.length + directory.length;
+
+  sizes.forEach((size, i) => {
+    const at = i * 16;
+    directory.writeUInt8(size >= 256 ? 0 : size, at + 0); // width  (0 == 256)
+    directory.writeUInt8(size >= 256 ? 0 : size, at + 1); // height
+    directory.writeUInt8(0, at + 2); // palette size, 0 for truecolour
+    directory.writeUInt8(0, at + 3); // reserved
+    directory.writeUInt16LE(1, at + 4); // colour planes
+    directory.writeUInt16LE(32, at + 6); // bits per pixel
+    directory.writeUInt32LE(images[i].length, at + 8);
+    directory.writeUInt32LE(offset, at + 12);
+    offset += images[i].length;
+  });
+
+  writeFileSync('public/favicon.ico', Buffer.concat([header, directory, ...images]));
+  console.log('  public/favicon.ico            16+32+48  ' +
+    (readFileSync('public/favicon.ico').length / 1024).toFixed(1) + ' KB');
+}
 
 const chrome = findChrome();
 const svg = readFileSync('public/favicon.svg', 'utf8');
@@ -119,7 +173,8 @@ ${svg}`;
     if (bytes === 0) throw new Error(`Chrome wrote an empty ${file}`);
     console.log(`  public/${file.padEnd(24)} ${size}x${size}  ${(bytes / 1024).toFixed(1)} KB`);
   }
-  console.log(`\n[icons] ${TARGETS.length} PNG(s) written from public/favicon.svg`);
+  writeIco();
+  console.log(`\n[icons] ${TARGETS.length} PNG(s) + favicon.ico written from public/favicon.svg`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

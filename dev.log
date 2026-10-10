@@ -1,0 +1,88 @@
+$ node scripts/gen-migrations.mjs && vite build && wrangler dev
+[gen-migrations] Wrote 2 migration(s) to D:\demon\src\worker\db\migrations.generated.ts
+[36mvite v7.3.7 [32mbuilding client environment for production...[36m[39m
+transforming...
+[33m.pnpm-store/v11/links/@/zod/4.6.5/6448fd814698825170f93bd428080c609bd45ccbc007f4c2dfd5fac1bb52f28d/node_modules/zod/v4/core/util.js (400:0): A comment
+
+"// Wrapped in a `@__PURE__` IIFE: esbuild never tree-shakes a top-level initializer that contains a member access on `Number`, so the bare object literal survived into every bundle."
+
+in ".pnpm-store/v11/links/@/zod/4.6.5/6448fd814698825170f93bd428080c609bd45ccbc007f4c2dfd5fac1bb52f28d/node_modules/zod/v4/core/util.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.[39m
+[33m.pnpm-store/v11/links/@/zod/4.6.5/6448fd814698825170f93bd428080c609bd45ccbc007f4c2dfd5fac1bb52f28d/node_modules/zod/v4/core/regexes.js (74:0): A comment
+
+"/** Anchors a pattern source. The interpolation lives here rather than at the call site because
+ * esbuild will not drop a `@__PURE__` call whose own argument interpolates a variable, but it
+ * will drop `anchor(dateSource)`. Keeping it inline pinned `date` into every bundle. */"
+
+in ".pnpm-store/v11/links/@/zod/4.6.5/6448fd814698825170f93bd428080c609bd45ccbc007f4c2dfd5fac1bb52f28d/node_modules/zod/v4/core/regexes.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.[39m
+[32m✓[39m 790 modules transformed.
+rendering chunks...
+computing gzip size...
+[2m../../dist/[22m[32mindex.html                       [39m[1m[2m  3.79 kB[22m[1m[22m[2m │ gzip:   1.54 kB[22m
+[2m../../dist/[22m[35massets/map-CIGW-MKW.css          [39m[1m[2m 15.61 kB[22m[1m[22m[2m │ gzip:   6.46 kB[22m
+[2m../../dist/[22m[35massets/index-BBgj3ZAD.css        [39m[1m[2m 39.68 kB[22m[1m[22m[2m │ gzip:   8.31 kB[22m
+[2m../../dist/[22m[36massets/PublicStatus-Bx5iABe4.js  [39m[1m[2m  6.76 kB[22m[1m[22m[2m │ gzip:   2.36 kB[22m[2m │ map:    22.18 kB[22m
+[2m../../dist/[22m[36massets/Groups-qFBVerE3.js        [39m[1m[2m  6.92 kB[22m[1m[22m[2m │ gzip:   2.39 kB[22m[2m │ map:    22.36 kB[22m
+[2m../../dist/[22m[36massets/Team-AXilCjEC.js          [39m[1m[2m  6.93 kB[22m[1m[22m[2m │ gzip:   2.56 kB[22m[2m │ map:    22.91 kB[22m
+[2m../../dist/[22m[36massets/Incidents-BOWH-wU8.js     [39m[1m[2m  8.29 kB[22m[1m[22m[2m │ gzip:   2.93 kB[22m[2m │ map:    26.75 kB[22m
+[2m../../dist/[22m[36massets/Monitors-Bbr4WX5F.js      [39m[1m[2m 14.78 kB[22m[1m[22m[2m │ gzip:   4.82 kB[22m[2m │ map:    42.18 kB[22m
+[2m../../dist/[22m[36massets/Channels-CwH3O4ED.js      [39m[1m[2m 18.05 kB[22m[1m[22m[2m │ gzip:   5.67 kB[22m[2m │ map:    60.84 kB[22m
+[2m../../dist/[22m[36massets/router-zijhUr0o.js        [39m[1m[2m 38.31 kB[22m[1m[22m[2m │ gzip:  13.79 kB[22m[2m │ map:   448.14 kB[22m
+[2m../../dist/[22m[36massets/index-9GEt_VVy.js         [39m[1m[2m 60.87 kB[22m[1m[22m[2m │ gzip:  17.97 kB[22m[2m │ map:   199.50 kB[22m
+[2m../../dist/[22m[36massets/map-EW1s7XMF.js           [39m[1m[2m153.94 kB[22m[1m[22m[2m │ gzip:  44.93 kB[22m[2m │ map:   704.57 kB[22m
+[2m../../dist/[22m[36massets/charts-C_WELEdy.js        [39m[1m[2m299.09 kB[22m[1m[22m[2m │ gzip:  82.47 kB[22m[2m │ map: 1,483.78 kB[22m
+[2m../../dist/[22m[36massets/vendor-BForsuFR.js        [39m[1m[2m379.30 kB[22m[1m[22m[2m │ gzip: 119.00 kB[22m[2m │ map: 2,084.56 kB[22m
+[32m✓ built in 14.34s[39m
+
+ ⛅️ wrangler 4.148.0 (update available 4.149.0)
+───────────────────────────────────────────────
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mProcessing wrangler.toml configuration:[0m
+
+    - "unsafe" fields are experimental and may change or break at any time.
+
+
+Your Worker has access to the following bindings:
+Binding                                             Resource                  Mode
+env.DB (pulsepost-db)                               D1 Database               local
+env.ASSETS                                          Assets                    local
+env.RATE_LIMITER_AUTH (ratelimit)                   Unsafe Metadata           remote
+env.RATE_LIMITER_API (ratelimit)                    Unsafe Metadata           remote
+env.DB_PROVIDER ("d1")                              Environment Variable      local
+env.ENVIRONMENT ("production")                      Environment Variable      local
+env.APP_NAME ("PulsePost")                          Environment Variable      local
+env.CORS_ORIGINS ("")                               Environment Variable      local
+env.ADMIN_IP_ALLOWLIST ("")                         Environment Variable      local
+env.AUTH_MODE ("password")                          Environment Variable      local
+env.CHECK_COLOS ("")                                Environment Variable      local
+env.CHECKS_PER_RUN (20)                             Environment Variable      local
+env.RAW_CHECK_RETENTION_DAYS (7)                    Environment Variable      local
+env.DAILY_STATUS_RETENTION_DAYS (365)               Environment Variable      local
+env.MAINTENANCE_HOUR_UTC (0)                        Environment Variable      local
+
+[33m▲ [43;33m[[43;30mWARNING[43;33m][0m [1mScheduled Workers are not automatically triggered during local development.[0m
+
+  To manually trigger a scheduled event, run:
+    curl "http://127.0.0.1:8787/cdn-cgi/local/scheduled"
+  For more details, see [4mhttps://developers.cloudflare.com/workers/configuration/cron-triggers/#test-cron-triggers-locally[0m
+
+
+Wrangler detected this dev session is running in an AI agent.
+The Local Explorer API is available at http://127.0.0.1:8787/cdn-cgi/local/explorer/api
+Useful routes:
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/workers - local Workers and bindings
+  POST http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/scheduled?worker=<name> - invoke a Worker's scheduled handler; cron is required (see the OpenAPI schema for the full request)
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/storage/kv/namespaces - KV namespaces
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/d1/database - D1 databases
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/r2/buckets - R2 buckets
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/workers/durable_objects/namespaces - Durable Object namespaces
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api/workflows - Workflows
+  POST http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/observability/query - run a read-only SQL query (SELECT/WITH only) over captured request traces and console logs. Tables: spans, logs (read attributes via json(attributes)). Example:
+    curl -X POST http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/observability/query -H 'Content-Type: application/json' -d '{"sql":"SELECT service, name, outcome, duration_ms FROM spans WHERE parent_id IS NULL LIMIT 20"}'
+  POST http://127.0.0.1:8787/cdn-cgi/local/explorer/api/local/observability/clear - clear all captured traces and logs
+If the routes above don't cover what you need, fetch the full OpenAPI schema (large - use only as a last resort):
+  GET http://127.0.0.1:8787/cdn-cgi/local/explorer/api - OpenAPI schema
+⎔ Starting local server...
+[wrangler:info] Ready on http://127.0.0.1:8787
+[wrangler:info] GET /api/health 200 OK (720ms)
+[wrangler:info] GET /favicon.ico 200 OK (14ms)
+⎔ Reloading local server...
+⎔ Local server updated and ready

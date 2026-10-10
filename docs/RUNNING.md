@@ -1,6 +1,6 @@
 # RUNNING & TESTING (Hinglish guide)
 
-> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+> **Docs index:** [README](../README.md) · [Deploy](DEPLOYMENT.md) · [Config](CONFIGURATION.md) · [API](API.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 Yeh file batati hai ki project ko **locally kaise chalana hai**, **test kaise karna hai**,
 aur — sabse important — **bina internet ke kaise chalana hai**.
@@ -42,7 +42,7 @@ pnpm dev
 ```
 
 Is project ka default pnpm hai `.npmrc` mein (`store-dir=.pnpm-store`) aur
-`pnpm-workspace.yaml` mein approved build scripts ke saath.
+`../pnpm-workspace.yaml` mein approved build scripts ke saath.
 
 ### bun
 
@@ -60,7 +60,7 @@ Do baatein dhyan mein rakhna:
 1. **`bun` Node scripts ko seedha run nahi karta** (wahan TS type-stripping built-in
    hai, par hamare `--experimental-strip-types` wale test command ko `node` chahiye).
    Isliye tests ke liye Node use karo: `pnpm test`.
-2. `bun install` karne se `bun.lock` banega. **Lockfile ek hi rakho** — ya `pnpm-lock.yaml`,
+2. `bun install` karne se `bun.lock` banega. **Lockfile ek hi rakho** — ya `../pnpm-lock.yaml`,
    ya `bun.lock`, dono nahi. Warna dependency resolve alag-alag ho jaata hai.
 
 ### npm
@@ -71,7 +71,7 @@ npm run build
 npm test
 ```
 
-Chalta hai, par lockfile ka format alag hota hai (`package-lock.json`).
+Chalta hai, par lockfile ka format alag hota hai (`../package-lock.json`).
 
 ---
 
@@ -242,9 +242,9 @@ Test suites:
 
 | File | Kya cover karta hai |
 |---|---|
-| `tests/db.test.ts` | dialect translation, auto-migration, upsert, transactions, FK cascade, provider selection |
-| `tests/checker.test.ts` | SSRF guard (IPv4/IPv6/DNS), HTTP monitor, multi-step DSL, assertions |
-| `tests/api.test.ts` | Poora Hono app: security headers, auth, Zod, rate limiting, IP allowlist |
+| `../tests/db.test.ts` | dialect translation, auto-migration, upsert, transactions, FK cascade, provider selection |
+| `../tests/checker.test.ts` | SSRF guard (IPv4/IPv6/DNS), HTTP monitor, multi-step DSL, assertions |
+| `../tests/api.test.ts` | Poora Hono app: security headers, auth, Zod, rate limiting, IP allowlist |
 
 ### Sab kuch ek saath
 
@@ -265,7 +265,7 @@ pnpm offline:check         # 5. confirm (NO INTERNET)
 ```
 
 Agar step 2 fail ho raha hai, yaar — matlab `.pnpm-store` complete nahi hai ya
-`pnpm-lock.yaml` change hua hai. Wapas online jao aur step 1 dobara chalao.
+`../pnpm-lock.yaml` change hua hai. Wapas online jao aur step 1 dobara chalao.
 
 ---
 
@@ -284,5 +284,5 @@ pulsepost/
 └─ dist/               # Built frontend (Workers Static Assets serve karta hai)
 ```
 
-`src/worker` aur `src/web` alag folders mein hain, par dono **ek hi Worker** se serve
+`../src/worker` aur `../src/web` alag folders mein hain, par dono **ek hi Worker** se serve
 hote hain — yahi is project ka core idea hai.

@@ -1,6 +1,6 @@
 # ANALYSIS.md — PulsePost Phase 1: Deep Analysis & Real-Time Web Research
 
-> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+> **Docs index:** [README](../README.md) · [Deploy](DEPLOYMENT.md) · [Config](CONFIGURATION.md) · [API](API.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 > **Phase 1 deliverable.** Ye file padhne ke baad hi code me haath daalna chahiye.
 > Research date: **9 October 2026**. Saare Cloudflare numbers official docs se
@@ -89,8 +89,8 @@ deploy = gen-migrations → vite build → wrangler deploy
 dev    = gen-migrations → vite build → wrangler dev
 ```
 
-`migrations/0001_init.sql` build-time pe embed hota hai
-(`src/worker/db/migrations.generated.ts`). Runtime pe app **har request pe
+`../migrations/0001_init.sql` build-time pe embed hota hai
+(`../src/worker/db/migrations.generated.ts`). Runtime pe app **har request pe
 `db.migrate()`** call karta hai (`src/worker/middleware/context.ts:47`), jo
 isolate lifetime ke liye memoize hota hai — isliye deploy ke baad first request
 schema khud apply kar deta hai.
@@ -135,7 +135,7 @@ npm view cf-knex              →  0.3.2
 4. D1 ka native binding aur Neon-over-WebSocket ka koi answer nahi deta.
 
 **Decision:** hand-rolled adapter. ~250 lines, poora control, chhota bundle,
-predictable CPU. **Ye already implemented hai** (`src/worker/db/`).
+predictable CPU. **Ye already implemented hai** (`../src/worker/db/`).
 
 ---
 
@@ -196,7 +196,7 @@ Source: <https://developers.cloudflare.com/d1/platform/limits/> (updated **Apr 2
 ### 🐛 Ye research ek REAL bug uncover karta hai
 
 `listWithStatus()` mein maine is session me search add kiya tha
-(`src/worker/repository/monitors.ts`). Maine schema me `q` ka max **120 chars**
+(`../src/worker/repository/monitors.ts`). Maine schema me `q` ka max **120 chars**
 rakha tha.
 
 **D1 ka `LIKE` pattern limit 50 bytes hai.** Matlab 51+ characters ka search
@@ -204,8 +204,8 @@ validation pass kar lega, phir database error throw karega — exactly wahan jah
 user ko ek normal search karni thi. Aur woh *free tier pe* hoga.
 
 **Fix (lagaya):**
-- `src/shared/schemas.ts` — `q` ka max **48** (kyunki pattern 2 `%` se wrap hota hai)
-- `src/worker/repository/monitors.ts` — `likePattern()` bhi `.slice(0, 48)` karta hai, taaki schema bypass karne wala future caller bhi error na mile, balki chhota result paaye
+- `../src/shared/schemas.ts` — `q` ka max **48** (kyunki pattern 2 `%` se wrap hota hai)
+- `../src/worker/repository/monitors.ts` — `likePattern()` bhi `.slice(0, 48)` karta hai, taaki schema bypass karne wala future caller bhi error na mile, balki chhota result paaye
 
 **Yehi kaam Phase 1 ka asli faida hai — research ne ek bug pakda jo bina research ke production pe hi fail hota.**
 
@@ -269,7 +269,7 @@ Ye Phase 4 ka research hai — aur **verify karta hai ki current design sahi hai
 
 **Pattern jo project follow karta hai sahi hai:** ek `dialect.ts` layer jo sirf
 *syntax* translate karta hai — placeholder, boolean, `{{now}}` token. SQL khud
-**same** rehta hai. Yehi wajah hai ki `migrations/0001_init.sql` ek hi file
+**same** rehta hai. Yehi wajah hai ki `../migrations/0001_init.sql` ek hi file
 SQLite aur Postgres dono pe chalti hai.
 
 ⚠️ **Ek inconsistency mili:** `migrations/0001_init.sql:12` header mein likha hai
@@ -315,7 +315,7 @@ Brief me "Use Apprise library (Python) for unified notification routing" likha h
    **10 ms CPU** dono ko kha jayega.
 
 **Recommended替代 (substitute):** TypeScript me ek `NotificationTransport`
-interface — jo `src/worker/notifications/send.ts` already implicitly hai —
+interface — jo `../src/worker/notifications/send.ts` already implicitly hai —
 aur har channel ka ek chhota module. Isse:
 - Zero extra runtime
 - Har channel ka **test button** naturally banta hai

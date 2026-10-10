@@ -52,7 +52,7 @@ PR bhejne se pehle `pnpm verify` clean hona chahiye.
 ### Types
 
 - `strict` mode, `any` nahi. Unknown shape ke liye `unknown` + narrowing use karo.
-- Worker aur web dono ke schemas `src/shared/schemas.ts` me Zod se — **dono taraf
+- Worker aur web dono ke schemas `../src/shared/schemas.ts` me Zod se — **dono taraf
   ek hi definition**, taaki frontend aur backend kabhi disagree na kar sakein.
 
 ### Comments
@@ -76,7 +76,7 @@ sabse valuable line hoti hai.
 - SQL **portable** rakho — SQLite aur Postgres dono pe chalna chahiye.
   `AUTOINCREMENT`, `datetime('now')`, `INSERT OR REPLACE`, `GROUP_CONCAT` /
   `string_agg` mat likho. Placeholders `{{now}}` aur `{{now_date}}` use karo,
-  `src/worker/db/dialect.ts` inhe engine ke hisaab se rewrite karta hai.
+  `../src/worker/db/dialect.ts` inhe engine ke hisaab se rewrite karta hai.
 - `LIMIT`/`OFFSET` ke saath count avoid karo — `has_more` pattern behtar hai.
 
 ### UI
@@ -95,7 +95,7 @@ sabse valuable line hoti hai.
 
 ## Tests
 
-`tests/` me Node ka built-in runner (`node --test`), koi framework nahi.
+`../tests/` me Node ka built-in runner (`node --test`), koi framework nahi.
 
 ```bash
 pnpm test
@@ -130,9 +130,9 @@ leading digit of every label was sheared off — "136ms" rendered as
 1. Branch banao: `git checkout -b short-description`
 2. Chhote commits, har ek self-contained
 3. `pnpm verify` clean
-4. PR kholo — **screenshots** design ya UI changes me (haan, `scripts/shoot.mjs`
+4. PR kholo — **screenshots** design ya UI changes me (haan, `../scripts/shoot.mjs`
    hai iske liye)
-5. Secret dhyan rakhna: `wrangler.toml`, `.dev.vars`, `.env` kabhi commit nahi
+5. Secret dhyan rakhna: `../wrangler.toml`, `.dev.vars`, `.env` kabhi commit nahi
 
 ---
 

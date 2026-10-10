@@ -1,6 +1,6 @@
 # PROGRESS
 
-> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+> **Docs index:** [README](../README.md) · [Deploy](DEPLOYMENT.md) · [Config](CONFIGURATION.md) · [API](API.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 Dense changelog of completed work. No markdown formatting beyond bullets.
 
@@ -96,13 +96,13 @@ and maps to the architecture: each Cloudflare colo is a post, each check is a pu
 Renamed across 12 source files, tests, SQL, docs and config. 0 leftovers, 105 tests still pass.
 
 ### Offline-first
-`.npmrc` / `pnpm-workspace.yaml` moved the pnpm store into the project (`.pnpm-store`, 224 MB,
+`.npmrc` / `../pnpm-workspace.yaml` moved the pnpm store into the project (`.pnpm-store`, 224 MB,
 180 packages) so `pnpm install --offline --frozen-lockfile` works on a fresh machine.
-`scripts/check-offline.mjs` scans `dist/` for remote assets, CDN hosts and web fonts — it fails
+`../scripts/check-offline.mjs` scans `dist/` for remote assets, CDN hosts and web fonts — it fails
 the build if anyone reintroduces a network dependency. Verified end to end: offline install 67ms,
 build 6.7s, 105 tests, offline check clean.
 Node's type-stripping loader rejects TS parameter properties; `MemoryLimiter` was rewritten with
-explicit fields. Keep `src/` erasable-syntax-only.
+explicit fields. Keep `../src/` erasable-syntax-only.
 
 ### UI
 Dark dashboard: stat tiles, Leaflet edge map, Recharts latency chart, monitor list with

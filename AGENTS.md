@@ -146,7 +146,7 @@ allowance while every response still returns 200.
 - **Workers KV allows 1,000 writes/day free.** Caching a 30-second poll in KV
   exhausts that on its own. Use the Cache API, which bills requests.
 
-Full numbers in `D1-AUDIT.md`.
+Full numbers in `docs/D1-AUDIT.md`.
 
 ## Migrations and schema drift
 
@@ -206,7 +206,7 @@ gitignored; leave it alone.
 
 ## Docs are written in Hinglish and are load-bearing
 
-`README.md`, `docs/*.md`, `D1-AUDIT.md`, `CHANGELOG.md`. Two rules learned the
+`README.md`, `AGENTS.md` and everything in `docs/`. Two rules learned the
 hard way:
 
 - **Check every claim against the source before writing it.** The old README

@@ -119,7 +119,7 @@ pnpm offline:install    # --offline --frozen-lockfile
 pnpm offline:check      # verify karta hai ki kya kya missing hai
 ```
 
-Details [`RUNNING.md`](RUNNING.md) me.
+Details [`RUNNING.md`](docs/RUNNING.md) me.
 
 ---
 
@@ -241,7 +241,7 @@ wahi payload builder use karte hain.
 
 ## Cloudflare D1 usage
 
-Poora audit [`D1-AUDIT.md`](D1-AUDIT.md) me hai. Sabse zaroori baatein:
+Poora audit [`D1-AUDIT.md`](docs/D1-AUDIT.md) me hai. Sabse zaroori baatein:
 
 | Operation | Frequency | Rows Read/Day | Rows Written/Day |
 |---|---|---|---|
@@ -330,24 +330,45 @@ add karna hai to ek adapter likho, baaki code untouched rehta hai.
 
 ## Documentation
 
-| File | Kya hai |
+### Getting started
+
+| Document | Kya milega |
 |---|---|
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | Cloudflare + doosre providers pe deploy, step by step |
 | [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) | Har env var, har secret, default value ke saath |
-| [`docs/API.md`](docs/API.md) | Saare 36 REST endpoints, auth ke saath |
+| [`docs/RUNNING.md`](docs/RUNNING.md) | Troubleshooting, offline install |
 | [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) | Local setup, conventions, PR flow |
-| [`D1-AUDIT.md`](D1-AUDIT.md) | D1 usage audit — queries, rows read/written, optimizations |
-| [`RUNNING.md`](RUNNING.md) | Troubleshooting, offline install |
-| [`ANALYSIS.md`](ANALYSIS.md) | Design decisions aur architecture rationale |
-| [`SECURITY.md`](SECURITY.md) | Threat model, disclosure policy |
-| [`PROGRESS.md`](PROGRESS.md) | Kya bana, kya bugs mile |
+
+### Reference
+
+| Document | Kya milega |
+|---|---|
+| [`docs/API.md`](docs/API.md) | Saare REST endpoints, auth ke saath |
+| [`docs/D1-AUDIT.md`](docs/D1-AUDIT.md) | D1 usage audit — queries, rows read/written, optimizations |
+| [`docs/ANALYSIS.md`](docs/ANALYSIS.md) | Design decisions aur architecture rationale |
+
+### Project
+
+| Document | Kya milega |
+|---|---|
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Kya bana, kya bacha, kya decide hua |
+| [`docs/PROGRESS.md`](docs/PROGRESS.md) | Kaam ka log aur milne wale bugs |
+| [`docs/CHANGELOG.md`](docs/CHANGELOG.md) | Release-wise changes |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Threat model, disclosure policy |
+
+### Repository conventions
+
+| File | Kya hai |
+|---|---|
+| [`README.md`](README.md) | Ye page — yahan se shuruaat |
+| [`AGENTS.md`](AGENTS.md) | AI agents ke liye instructions: commands, traps, conventions |
 
 ---
 
 ## Security
 
 Koi vulnerability mili ho to report karein — public issue ke bajaye
-private channel prefer karenge. Details [`SECURITY.md`](SECURITY.md) me.
+private channel prefer karenge. Details [`SECURITY.md`](docs/SECURITY.md) me.
 
 > **Production pe deploy karne ke baad** pehla admin account bana do aur
 > `.dev.vars` / `wrangler.toml` kabhi commit mat karna. Dono gitignore me hain.

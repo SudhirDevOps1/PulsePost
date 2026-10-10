@@ -33,7 +33,7 @@ pnpm install
 cp wrangler.toml.example wrangler.toml
 ```
 
-`wrangler.toml` gitignored hai — isme database ID aayegi, wo kabhi commit nahi karni.
+`../wrangler.toml` gitignored hai — isme database ID aayegi, wo kabhi commit nahi karni.
 
 ### Step 3 — database banao
 
@@ -41,10 +41,10 @@ cp wrangler.toml.example wrangler.toml
 pnpm exec wrangler d1 create pulsepost-db
 ```
 
-Ye ek `database_id` print karta hai. Use `wrangler.toml` me `[[d1_databases]]`
+Ye ek `database_id` print karta hai. Use `../wrangler.toml` me `[[d1_databases]]`
 ke `database_id` me paste kar do.
 
-> **Ye ID private hai.** Repo public hai, isliye `wrangler.toml` kabhi commit mat
+> **Ye ID private hai.** Repo public hai, isliye `../wrangler.toml` kabhi commit mat
 > karna. `.gitignore` me pehle se hai — verify kar lena:
 > `git check-ignore wrangler.toml`
 
@@ -112,7 +112,7 @@ Budget khatam hone se pehle warning kaise milegi, wo
 ## 4. Doosre database providers
 
 `DB_PROVIDER` badlo, baaki code same rehta hai. Har provider ka connection
-detail `wrangler.toml` ke `[vars]` me hai.
+detail `../wrangler.toml` ke `[vars]` me hai.
 
 ### Turso (LibSQL)
 
@@ -158,7 +158,7 @@ DB_PROVIDER = "supabase"
 pnpm exec wrangler hyperdrive create pulsepost-pg
 ```
 
-`wrangler.toml` me uska ID daalo, phir:
+`../wrangler.toml` me uska ID daalo, phir:
 
 ```toml
 [vars]
@@ -186,7 +186,7 @@ pnpm db:migrate
 
 ## 5. Custom domain (optional)
 
-Free subdomain kaafi hai. Custom domain lagana ho to `wrangler.toml`:
+Free subdomain kaafi hai. Custom domain lagana ho to `../wrangler.toml`:
 
 ```toml
 routes = [
@@ -256,14 +256,14 @@ migrations ek baar me mat jodo.
 
 | Problem | Reason |
 |---|---|
-| `Database ID not found` | `wrangler.toml` me `database_id` galat ya missing |
-| Cron chal hi nahi raha | `CRON_SECRET` set nahi, ya `wrangler.toml` me `triggers` missing |
+| `Database ID not found` | `../wrangler.toml` me `database_id` galat ya missing |
+| Cron chal hi nahi raha | `CRON_SECRET` set nahi, ya `../wrangler.toml` me `triggers` missing |
 | `Setup has already been completed` (409) | Pehle admin ban chuka hai — `/settings` se users dekho |
 | Dashboard khaali hai | Sweep nahi hua. Deploy ke baad ek minute wait karo |
 | Map khaali hai | Edge nodes tab dikhte hain jab `request.cf` colo de — local dev me nahi aata |
 | 500 on D1 queries | D1 ke 50 queries/invocation cross ho gaye. `CHECKS_PER_RUN` kam karo |
 
-Baaki [`RUNNING.md`](../RUNNING.md) me.
+Baaki [`RUNNING.md`](RUNNING.md) me.
 
 ---
 

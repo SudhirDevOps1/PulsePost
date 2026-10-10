@@ -1,6 +1,6 @@
 # Security
 
-> **Docs index:** [README](README.md) · [Deploy](docs/DEPLOYMENT.md) · [Config](docs/CONFIGURATION.md) · [API](docs/API.md) · [Contributing](docs/CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+> **Docs index:** [README](../README.md) · [Deploy](DEPLOYMENT.md) · [Config](CONFIGURATION.md) · [API](API.md) · [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 PulsePost khud ko internet par expose karta hai — wo iska kaam hai. Is liye
 security assumptions yahan likhi hain taaki aap jaan sakein kya kya guard hai,
@@ -11,7 +11,7 @@ kya kya nahi, aur apna instance kaise harden karein.
 ## Reporting a vulnerability
 
 Please public issue ke bajaye private tareeke se report karein. Details
-`package.json` ke `repository` field mein diye hain.
+`../package.json` ke `repository` field mein diye hain.
 
 Include karein: kya expect kar rahe the, kya hua actually, steps to reproduce.
 Public disclosure se pehle fix deploy karne ka time dena.
@@ -48,7 +48,7 @@ Seed **at rest encrypted** hota hai, `TOTP_SECRET` se AES-256-GCM.
 ## SSRF protection
 
 Monitor URLs server se fetch hoti hain — ye classic SSRF vector hai. Guard
-`src/worker/checkers/ssrf.ts` mein hai aur block karta hai:
+`../src/worker/checkers/ssrf.ts` mein hai aur block karta hai:
 
 - Loopback, private (RFC 1918), link-local, CGNAT ranges
 - IPv4-mapped IPv6 addresses (bypass vector)
@@ -130,7 +130,7 @@ Deploy ke baad ye kar lein:
    node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
    ```
 5. **`TOTP_SECRET` set karein** agar 2FA use karna hai.
-6. **Secrets `wrangler secret put` se**, kabhi `wrangler.toml` mein nahi.
+6. **Secrets `wrangler secret put` se**, kabhi `../wrangler.toml` mein nahi.
 
 ---
 

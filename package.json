@@ -35,7 +35,8 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check:hooks": "node scripts/check-hooks.mjs",
-    "verify": "node scripts/gen-migrations.mjs && node scripts/fix-imports.mjs && node scripts/check-hooks.mjs && tsc --noEmit && node --experimental-strip-types --test tests/*.test.ts",
+    "check:docs": "node scripts/check-doc-links.mjs",
+    "verify": "node scripts/gen-migrations.mjs && node scripts/fix-imports.mjs && node scripts/check-hooks.mjs && node scripts/check-doc-links.mjs && tsc --noEmit && node --experimental-strip-types --test tests/*.test.ts",
     "offline:prepare": "pnpm fetch --store-dir .pnpm-store",
     "offline:install": "pnpm install --offline --frozen-lockfile",
     "offline:check": "node scripts/check-offline.mjs"

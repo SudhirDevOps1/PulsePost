@@ -2,10 +2,10 @@
 
 Cloudflare D1 usage ka poora audit, real schema ke against. Ye file
 project-specific hai — Cloudflare ke generic D1 guides se copy nahi ki, balki
-`src/worker/` ke actual queries padhkar likhi gayi hai.
+`../src/worker/` ke actual queries padhkar likhi gayi hai.
 
 **Audit date:** 10 October 2026
-**Schema ke against:** `migrations/0001_init.sql` (check taabe `checks`, log
+**Schema ke against:** `../migrations/0001_init.sql` (check taabe `checks`, log
 `audit_log`, monitors me `active` — koi `status` column nahi)
 
 ---
@@ -211,7 +211,7 @@ request count ke against bill hota hai, writes ke against nahi. Status page
 
 ## Phase 6 — Cron cleanup
 
-Already implemented, `src/worker/checkers/sweep.ts`:
+Already implemented, `../src/worker/checkers/sweep.ts`:
 
 | Table | Retention | Config |
 |---|---|---|
@@ -291,7 +291,7 @@ hai). Reads sirf **Fix 2** se kam honge.
 | Production pe deploy | ✅ `020b7ec6` |
 | Rollup coverage verify | ✅ Live API se confirm |
 
-Test `tests/rollup-query.test.ts` ek counting proxy D1 adapter ke aage lagata
+Test `../tests/rollup-query.test.ts` ek counting proxy D1 adapter ke aage lagata
 hai aur assert karta hai ke raw scan **kitni baar** chalti hai — 2 (purana) ya
 1 (naya). Boolean nahi, count — kyunki 24-hour query legitimately hamesha
 chalti hai aur "koi chali ya nahi" se fix ko break dhoondh liya gaya.

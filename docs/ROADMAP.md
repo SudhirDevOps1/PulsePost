@@ -210,20 +210,34 @@ Bata de kya hai. Tab tak placeholder transport bana ke rakh dunga, par **"unveri
 - Favicon nahi — har page pe `/favicon.ico 404` (logs me confirmed)
 - Logo inline SVG hai (`AppShell.tsx:148`) — sirf header me
 
-### Plan (additive)
+### Shipped
+
+Ye plan poora implement ho chuka hai. Table abhi ek non-existent file (`icon.svg`) list
+karta tha — asli source `favicon.svg` hai — aur wo bataya nahi ki PNGs ek script se
+banti hain, jisse koi unhe haath se edit kar le to source aur output alag ho jayenge.
 
 | Asset | Purpose |
 |---|---|
-| `public/icon.svg` | Scalable source-of-truth |
-| `public/favicon.svg` | Modern browsers |
-| `public/apple-touch-icon.png` | iOS home screen |
-| `public/icon-192.png` / `icon-512.png` | PWA / Android |
-| `manifest.webmanifest` | Installable app |
-| `<link rel="icon">` | Wire-up |
+| `../public/favicon.svg` | **Source of truth.** Inhe edit karo, PNG ko nahi. |
+| `../public/favicon.ico` | 16+32+48 ek file me. Browser ka default lookup path. |
+| `../public/favicon-16.png` / `-32.png` / `-48.png` | Explicit `<link>` sizes |
+| `../public/apple-touch-icon.png` | iOS home screen (180×180). iOS SVG ignore karta hai. |
+| `../public/icon-192.png` / `icon-512.png` | PWA / Android install |
+| `../public/logo.png` | 1024×1024, README aur social preview |
+| `../public/manifest.webmanifest` | Installable app |
 
-**Design:** Current logo rakhta hoon (3 edge nodes + pulse line), minimalist version — single accent, cleaner geometry, 16px pe bhi readable.
+**Rebuild:** `node scripts/make-icons.mjs`. Chrome SVG ko rasterize karti hai, isliye
+output wahi hai jo browser draw karega — vector ka dobara implementation nahi. Koi
+image library dependency nahi lagi, to 64 MiB Worker budget par koi asar nahi.
 
-PNG generation ke liye dev dependency chahiye hogi — **sirf devDependency**, runtime bundle me nahi jayegi. Free tier ka 64 MiB budget safe.
+**`/favicon.ico` ka ek fark hai jo nazar nahi aata:** wrangler `not_found_handling =
+"single-page-application"` set karta hai, jisse `/status/my-team` hard refresh pe
+zinda rehta hai — lekin us setting se har unmatched path pe `index.html` chala
+jaata hai. Usi wajah se `/favicon.ico` ek waqt pe `200 text/html` de raha tha aur tab
+pe generic globe aa raha tha. Har browser wo path convention se maangta hai, chahe
+koi `<link>` tag ho ya na ho. `not_found_handling` badalna galat hota — ek cosmetic
+asset ke liye client-side routing barbaad karna bekaar trade hai — isliye path pe
+asli file rakhi gayi.
 
 ---
 
@@ -267,7 +281,7 @@ setup.sh      (macOS/Linux/Git Bash)
 setup.ps1     (Windows — tere machine ke liye)
 ```
 
-Flow: login check → `d1 create` → `wrangler.toml` generate → `secret put CRON_SECRET` → deploy → live URL print.
+Flow: login check → `d1 create` → `../wrangler.toml` generate → `secret put CRON_SECRET` → deploy → live URL print.
 
 **No card. No domain. 6 commands.**
 

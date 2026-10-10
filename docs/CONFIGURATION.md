@@ -1,11 +1,11 @@
 # Configuration
 
-PulsePost ka poora behaviour do jagah se control hota hai: `wrangler.toml` ke
+PulsePost ka poora behaviour do jagah se control hota hai: `../wrangler.toml` ke
 `[vars]` (non-secret) aur Cloudflare secrets (sensitive).
 
 ---
 
-## Non-secret config — `[vars]` in `wrangler.toml`
+## Non-secret config — `[vars]` in `../wrangler.toml`
 
 Ye file gitignored hai. Values edit karne ke baad `pnpm deploy` chalao.
 
@@ -24,8 +24,8 @@ Kaunsa database adapter active karega. Isi ek line se lock-in khatam hoti hai.
 | `hyperdrive` | Postgres via Hyperdrive | `wrangler hyperdrive create` |
 | `sqlite` | Local SQLite file | `DATABASE_URL=file:./data/…` |
 
-Adapter `src/worker/db/` me ek file per provider hai. Naya provider add karna ho
-to `src/worker/db/types.ts` wala interface implement karo.
+Adapter `../src/worker/db/` me ek file per provider hai. Naya provider add karna ho
+to `../src/worker/db/types.ts` wala interface implement karo.
 
 ---
 
@@ -177,7 +177,7 @@ service monitor karna, waise case).
 
 ## Secrets
 
-`wrangler.toml` me **kabhi nahi**. Ye command se jaate hain:
+`../wrangler.toml` me **kabhi nahi**. Ye command se jaate hain:
 
 ```bash
 pnpm exec wrangler secret put <NAME>

@@ -43,7 +43,7 @@
 
 ### Verified
 
-- 185/185 tests (3 new in `tests/hourly-rollup.test.ts`), typecheck clean,
+- 185/185 tests (3 new in `../tests/hourly-rollup.test.ts`), typecheck clean,
   `pnpm verify` exit 0.
 - The new tests were confirmed to **fail against the pre-fix behaviour** (2 of 3
   fail with the hourly call disabled) rather than merely passing alongside it.
@@ -62,7 +62,7 @@ The cost was coming from it running continuously for a day, not from it existing
 ### Added
 
 - **Real rasterised icons, generated from the SVG.** `node scripts/make-icons.mjs`
-  renders `public/favicon.svg` into 16, 32, 180, 192, 512 and 1024 PNGs. The SVG
+  renders `../public/favicon.svg` into 16, 32, 180, 192, 512 and 1024 PNGs. The SVG
   stays the source of truth; the PNGs are committed output.
 
   These exist because an SVG favicon is correct on one modern desktop browser
@@ -92,7 +92,7 @@ The cost was coming from it running continuously for a day, not from it existing
   `github.com/owner/repo` rather than `.../blob/main/`, the request 404'd, and
   the reader saw the alt text. Confirmed against GitHub's rendered HTML, which
   was `<a href="public/favicon.svg"><img src="public/favicon.svg"></a>` -- the
-  raw path, unrewritten. It is now `![PulsePost](public/icon-192.png)`. PNG
+  raw path, unrewritten. It is now `![PulsePost](../public/icon-192.png)`. PNG
   rather than SVG because the mark has a `viewBox` and no intrinsic `width`, so
   a Markdown image would have no size for the browser to lay out.
 

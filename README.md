@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/favicon.svg" alt="PulsePost" width="96" height="96">
+![PulsePost](public/icon-192.png)
 
 # PulsePost
 

@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { api, ApiError } from '../api.ts';
-import type { PublicStatus } from '../types.ts';
+import type { PublicGroup, PublicStatus } from '../types.ts';
 import { UptimeBars } from '../components/UptimeBars.tsx';
 import { usePolling } from '../hooks/usePolling.ts';
 import {
@@ -80,43 +80,103 @@ function StatusView({ days, slug }: { days: number; slug?: string }) {
   // hardest: no timer at all while the tab is hidden.
   usePolling(load, 60_000);
 
+  const groups = status?.groups ?? [];
+  /*
+   * Fleet summary, and the defensive defaults, declared BEFORE the early
+   * returns rather than after them.
+   *
+   * The position matters as much as the fallback. `summary` is a `useMemo`, and
+   * a hook below a conditional return is a hook that runs conditionally: React
+   * throws the moment the branch flips, which here would mean every visitor
+   * whose first paint is the skeleton crashes instead of seeing the page.
+   *
+   * The defaults themselves exist because this page is public and is usually
+   * opened from a link with no operator around. A missing array field must
+   * degrade to "nothing to show", never to a blank page -- a blank status page
+   * during an incident is the worst failure mode this app has.
+   */
+  const summary = useMemo(() => summarise(groups), [groups]);
+
   if (loading) return <StatusSkeleton />;
   if (error) return <div className="p-6"><ErrorNote message={error} /></div>;
   if (!status) return <StatusSkeleton />;
 
-  /**
-   * Defensive defaults.
-   *
-   * This page is public and is usually opened from a link with no operator
-   * around. A missing array field must degrade to "nothing to show", never to a
-   * blank page — a blank status page during an incident is the worst possible
-   * failure mode this app has.
-   */
-  const groups = status.groups ?? [];
   const incidents = status.incidents ?? [];
   const activeIncidents = incidents.filter((incident) => incident.status !== 'resolved');
   const hasMonitors = groups.some((group) => (group.monitors?.length ?? 0) > 0);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 px-4 py-8 sm:px-6">
-      <header className="flex flex-col items-center gap-3 text-center">
-        <h1 className="text-xl font-semibold tracking-tight">{status.app_name} status</h1>
-        <div className="flex items-center gap-2.5">
-          <StatusDot status={hasMonitors ? status.overall : null} size={12} pulse={false} />
-          <span className="text-sm font-medium" style={{ color: statusColor(status.overall) }}>
-            {hasMonitors ? statusLabel(status.overall) : 'No monitors published'}
-          </span>
+      {/*
+        The headline.
+
+        A status page is read in one glance, usually by someone who is already
+        worried. Everything here is a number or a bar: the state, how many
+        monitors are behind it, and the whole window drawn as one strip. The
+        previous version was three lines of centred text and then a list, which
+        answered none of the three questions a reader arrives with.
+      */}
+      <header className="overflow-hidden rounded-[var(--radius-panel)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-1)]">
+        <div className="flex flex-col items-center gap-4 px-5 py-6 text-center">
+          <div className="flex items-center gap-3">
+            <StatusDot status={hasMonitors ? status.overall : null} size={16} pulse={false} />
+            <span
+              className="text-3xl font-bold tracking-tight"
+              style={{ color: statusColor(status.overall) }}
+            >
+              {hasMonitors ? statusLabel(status.overall) : 'No monitors published'}
+            </span>
+          </div>
+
+          <p className="-mt-2 text-xs text-[var(--color-text-tertiary)]">
+            {status.app_name} · updated {timeAgo(status.generated_at)}
+          </p>
+
+          {summary.total > 0 ? (
+            <div className="grid w-full grid-cols-3 gap-2 sm:max-w-md">
+              <Counter label="Up" value={summary.up} tone="up" />
+              <Counter label="Degraded" value={summary.degraded} tone="degraded" />
+              <Counter label="Down" value={summary.down} tone="down" />
+            </div>
+          ) : null}
         </div>
-        <p className="text-xs text-[var(--color-text-tertiary)]">
-          Updated {timeAgo(status.generated_at)} · refreshed every minute
-        </p>
+
+        {/* The window, as one strip. `UptimeBars` renders days it has no data for
+            as neutral rather than as healthy, so an empty stretch reads as
+            "unknown" instead of quietly inflating the figure above it. */}
+        {summary.days.length > 0 ? (
+          <div className="border-t border-[var(--color-border-subtle)] px-5 py-4">
+            <UptimeBars daily={summary.days} days={status.days} height={38} />
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className="text-[var(--color-text-tertiary)]">
+                Last {status.days} days
+                {summary.days.length < status.days
+                  ? ` · ${summary.days.length} with data`
+                  : ''}
+              </span>
+              {summary.uptime !== null ? (
+                <span className="tabular font-semibold">
+                  <span style={{ color: `var(--color-${uptimeTone(summary.uptime)})` }}>
+                    {formatUptime(summary.uptime)}
+                  </span>
+                  <span className="ml-1.5 font-normal text-[var(--color-text-tertiary)]">
+                    average daily uptime
+                  </span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
         {slug ? (
-          <Link
-            to="/status"
-            className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-          >
-            ← All services
-          </Link>
+          <div className="border-t border-[var(--color-border-subtle)] px-5 py-3 text-center">
+            <Link
+              to="/status"
+              className="text-xs font-medium text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
+            >
+              ← All services
+            </Link>
+          </div>
         ) : null}
       </header>
 
@@ -219,6 +279,87 @@ function StatusSkeleton() {
       <Skeleton className="mx-auto h-5 w-40" />
       <Skeleton className="h-56" />
       <Skeleton className="h-72" />
+    </div>
+  );
+}
+
+/**
+ * Fleet-wide figures for the status header.
+ *
+ * Derived entirely from the `daily` arrays already in the payload, so it costs
+ * nothing: no extra query, no extra row read. That matters here more than usual
+ * -- this is the most-hit endpoint in the product, because it is the one a
+ * customer-facing link points at and it is polled every minute.
+ *
+ * The uptime figure is the mean of the daily averages, and it is labelled that
+ * way in the UI. It is not a check-weighted figure: the payload carries
+ * `uptime` per day but not the `total_checks` those percentages came from, and
+ * presenting an unweighted mean as "uptime" would be a nicer number than the
+ * truth. Days with no data are excluded rather than counted as 100%, which is
+ * the same reason `UptimeBars` leaves them blank instead of filling them in.
+ */
+function summarise(groups: PublicGroup[]): {
+  total: number;
+  up: number;
+  degraded: number;
+  down: number;
+  days: Array<{ date: string; uptime: number }>;
+  uptime: number | null;
+} {
+  const perDay = new Map<string, { sum: number; n: number }>();
+  let total = 0;
+  let up = 0;
+  let degraded = 0;
+  let down = 0;
+
+  for (const group of groups) {
+    for (const monitor of group.monitors ?? []) {
+      total += 1;
+      if (monitor.status === 'up') up += 1;
+      else if (monitor.status === 'degraded') degraded += 1;
+      else if (monitor.status === 'down') down += 1;
+
+      for (const day of monitor.daily ?? []) {
+        const bucket = perDay.get(day.date) ?? { sum: 0, n: 0 };
+        bucket.sum += day.uptime;
+        bucket.n += 1;
+        perDay.set(day.date, bucket);
+      }
+    }
+  }
+
+  const days = [...perDay.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([date, bucket]) => ({ date, uptime: bucket.sum / bucket.n }));
+
+  const known = days.map((d) => d.uptime).filter((v): v is number => v !== null);
+  const uptime = known.length > 0 ? known.reduce((a, b) => a + b, 0) / known.length : null;
+
+  return { total, up, degraded, down, days, uptime };
+}
+
+/** One of the three headline counters. A zero renders muted, not alarming. */
+function Counter({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone: 'up' | 'degraded' | 'down';
+}) {
+  const muted = value === 0;
+  return (
+    <div className="rounded-[var(--radius-control)] bg-[var(--color-surface-2)] px-3 py-2.5">
+      <div
+        className={`text-xl font-bold tabular ${muted ? 'text-[var(--color-text-tertiary)]' : ''}`}
+        style={muted ? undefined : { color: `var(--color-${tone})` }}
+      >
+        {value}
+      </div>
+      <div className="mt-0.5 text-[11px] font-medium text-[var(--color-text-tertiary)]">
+        {label}
+      </div>
     </div>
   );
 }

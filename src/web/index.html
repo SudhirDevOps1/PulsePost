@@ -8,9 +8,34 @@
     <meta name="theme-color" content="#fbfcfd" media="(prefers-color-scheme: light)" />
     <title>PulsePost</title>
     <meta name="description" content="Self-hosted uptime monitoring on Cloudflare's edge." />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!--
+      Icons, least-capable first.
+
+      PNG before SVG deliberately. Windows launchers, most desktop shells, and
+      anything reading the manifest prefer a raster file, and a browser only
+      falls through to a later <link> when an earlier one fails to *parse* --
+      not when it merely renders at the wrong size. iOS ignores an SVG
+      `apple-touch-icon` outright and screenshots the page instead, which is the
+      whole reason this is a list rather than a one-line SVG reference.
+
+      Regenerate with `node scripts/make-icons.mjs` after editing the SVG.
+    -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+
+    <!--
+      Social preview. Without these a shared link renders as a bare URL card
+      with no title and no image.
+    -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PulsePost" />
+    <meta property="og:description" content="Self-hosted uptime monitoring on Cloudflare's edge." />
+    <meta property="og:image" content="/logo.png" />
+    <meta name="twitter:card" content="summary" />
 
     <script>
       /*

@@ -2,6 +2,63 @@
 
 ### Added
 
+- **Real rasterised icons, generated from the SVG.** `node scripts/make-icons.mjs`
+  renders `public/favicon.svg` into 16, 32, 180, 192, 512 and 1024 PNGs. The SVG
+  stays the source of truth; the PNGs are committed output.
+
+  These exist because an SVG favicon is correct on one modern desktop browser
+  and wrong nearly everywhere else, in ways nobody notices until the site is
+  shared or installed:
+
+  - **iOS ignores an SVG `apple-touch-icon` outright** and screenshots the page
+    instead. The icon is not used at all.
+  - **Windows launchers and most desktop shells prefer a raster file** and fall
+    back to a generic globe when only SVG is offered.
+  - **A browser only falls through to a later `<link>` when an earlier one fails
+    to parse**, not when it merely renders at the wrong size -- so the PNG has to
+    come first in the list, not merely be present in it.
+
+- **The status page leads with the answer instead of a paragraph.** The headline
+  is now a full-width banner: the state at 3xl, an up/degraded/down counter
+  across published monitors, and the whole reporting window drawn as one strip
+  with an average-daily-uptime figure. It replaces three lines of centred text
+  and then a list, which answered none of the three questions a reader arrives
+  with.
+
+### Fixed
+
+- **The README logo never rendered.** GitHub rewrites a relative image path to
+  its camo proxy only for Markdown `![]()` syntax; a raw `<img src="...">` is
+  passed through untouched, so the browser resolved it against
+  `github.com/owner/repo` rather than `.../blob/main/`, the request 404'd, and
+  the reader saw the alt text. Confirmed against GitHub's rendered HTML, which
+  was `<a href="public/favicon.svg"><img src="public/favicon.svg"></a>` -- the
+  raw path, unrewritten. It is now `![PulsePost](public/icon-192.png)`. PNG
+  rather than SVG because the mark has a `viewBox` and no intrinsic `width`, so
+  a Markdown image would have no size for the browser to lay out.
+
+- **The tab showed a generic globe.** See the iOS and launcher notes above; the
+  `<link>` list now leads with 32px and 16px PNGs and keeps the SVG last.
+
+- **The manifest declared no usable icon.** Every entry pointed at the same SVG
+  with `sizes: "any"`, which is not a size any platform can act on. It now lists
+  real PNGs at their real dimensions, keeps a maskable entry, and declares
+  shortcuts for Dashboard, Add monitor and Alerts.
+
+- **Open Graph tags were absent**, so a shared link rendered as a bare URL card
+  with no title and no image.
+
+### Verified
+
+- 182/182 tests, typecheck clean, `pnpm verify` exit 0. All six assets confirmed
+  served with the correct content type (`image/png`, `image/svg+xml`,
+  `application/manifest+json`) and a real byte count.
+
+
+## [Unreleased]
+
+### Added
+
 - **The Response time panel can be pointed at any monitor.** It silently
   auto-selected one and the only clue was a small subtitle, so with several
   monitors configured the number on the chart belonged to nobody the reader
